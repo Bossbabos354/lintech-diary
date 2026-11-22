@@ -85,3 +85,37 @@ jobs:
           name: windows-package
           if-no-files-found: warn
           path: desktop/build/compose/binaries/main/msi/*.msi
+
+  release:
+    name: Release
+    needs: [linux, windows]
+    if: success()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(grep -m1 '^version = ' desktop/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: ЛинТех 28 ${{ steps.version.outputs.version }}
+          body: |
+            Автоматическая сборка десктопного дневника.
+
+            - Linux: `.deb`, `.rpm`
+            - Windows: `.msi`
+          files: artifacts/**/*
+          fail_on_unmatched_files: false
+          generate_release_notes: true
