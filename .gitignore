@@ -23,3 +23,8 @@ stable_debug/
 # служебное
 .DS_Store
 *.log
+
+# служебное MultiTool/IDE
+.gigatool/
+.pi-workflow/
+.vscode/
