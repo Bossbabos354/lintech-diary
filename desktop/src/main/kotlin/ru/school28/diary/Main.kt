@@ -1,4 +1,24 @@
 package ru.school28.diary
+import ru.school28.diary.ui.TerminalSplash
+import ru.school28.diary.ui.StatusLine
+import ru.school28.diary.ui.LogoOutro
+import ru.school28.diary.ui.LineState
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +49,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -104,6 +126,65 @@ fun main() {
 
 @Composable
 private fun AppRoot(state: AppState) {
+    var phase by remember { mutableIntStateOf(0) }
+    val lines = remember { mutableStateListOf<StatusLine>() }
+    var progress by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(Unit) {
+        fun add(text: String): Int {
+            lines.add(StatusLine(text))
+            return lines.lastIndex
+        }
+        fun mark(index: Int, st: LineState) {
+            if (index in lines.indices) lines[index] = lines[index].copy(state = st)
+        }
+        fun detail(text: String) {
+            lines.add(StatusLine(text, LineState.OK, detail = true))
+        }
+        if (Settings.isLoggedIn) {
+            mark(add("подключение к серверу"), LineState.OK)
+            detail("сессия восстановлена")
+            progress = 0.3f
+            val marksIndex = add("загрузка оценок")
+            try {
+                val marks = withTimeoutOrNull(20_000) { Repo.marks() } ?: emptyList()
+                mark(marksIndex, LineState.OK)
+                detail("предметов: ${marks.size}")
+                progress = 0.65f
+            } catch (e: Exception) {
+                AppLog.logException("splash/marks", e)
+                mark(marksIndex, LineState.ERROR)
+            }
+            val dairyIndex = add("загрузка домашних заданий")
+            try {
+                val (monday, sunday) = Util.weekRange(0)
+                val dairy = withTimeoutOrNull(20_000) { Repo.dairy(monday, sunday) } ?: emptyList()
+                mark(dairyIndex, LineState.OK)
+                detail("уроков: ${dairy.size}")
+                progress = 0.9f
+            } catch (e: Exception) {
+                AppLog.logException("splash/dairy", e)
+                mark(dairyIndex, LineState.ERROR)
+            }
+            mark(add("готово"), LineState.OK)
+        } else {
+            mark(add("вход в аккаунт"), LineState.OK)
+        }
+        progress = 1f
+        phase = 1
+    }
+
+    Crossfade(targetState = phase, animationSpec = tween(350), label = "splash") { current ->
+        when (current) {
+            0 -> TerminalSplash(lines, progress)
+            1 -> LogoOutro { phase = 2 }
+            else -> AppContent(state)
+        }
+    }
+}
+
+@Composable
+private fun AppContent(state: AppState) {
     Box(Modifier.fillMaxSize()) {
         AuroraBackground()
         if (state.loggedIn) {
@@ -151,8 +232,18 @@ private fun AppRoot(state: AppState) {
 private fun MainShell(state: AppState) {
     Column(Modifier.fillMaxSize()) {
         TopBar(state)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (state.tab) {
+        AnimatedContent(
+            targetState = state.tab,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = {
+                val forward = targetState > initialState
+                val dir = if (forward) 1 else -1
+                (slideInHorizontally { it * dir } + fadeIn(tween(200)))
+                    .togetherWith(slideOutHorizontally { -it * dir } + fadeOut(tween(140)))
+            },
+            label = "tab",
+        ) { tab ->
+            when (tab) {
                 0 -> DiaryScreen(state)
                 1 -> ScheduleScreen()
                 2 -> MarksScreen(state)
@@ -218,11 +309,22 @@ private fun BottomNav(state: AppState) {
         ) {
             TABS.forEachIndexed { index, item ->
                 val selected = state.tab == index
+                val navBg by animateColorAsState(
+                    if (selected) AppTheme.colors.primary else Color.Transparent,
+                    tween(220),
+                    label = "navBg",
+                )
+                val navScale by animateFloatAsState(
+                    if (selected) 1f else 0.95f,
+                    spring(dampingRatio = 0.7f, stiffness = 500f),
+                    label = "navScale",
+                )
                 Row(
                     Modifier
                         .weight(1f)
+                        .graphicsLayer { scaleX = navScale; scaleY = navScale }
                         .clip(RoundedCornerShape(20.dp))
-                        .background(if (selected) AppTheme.colors.primary else Color.Transparent)
+                        .background(navBg)
                         .clickable { state.tab = index }
                         .padding(vertical = 10.dp),
                     horizontalArrangement = Arrangement.Center,

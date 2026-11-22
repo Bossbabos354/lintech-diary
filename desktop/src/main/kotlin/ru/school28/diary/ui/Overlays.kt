@@ -1,4 +1,8 @@
 package ru.school28.diary.ui
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,14 +48,26 @@ import java.util.Locale
 /** Затемнение + центрированная карточка; клик по фону закрывает. */
 @Composable
 private fun Overlay(onClose: () -> Unit, content: @Composable () -> Unit) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val scale by animateFloatAsState(
+        if (shown) 1f else 0.94f,
+        spring(dampingRatio = 0.8f, stiffness = 500f),
+        label = "overlayScale",
+    )
+    val alpha by animateFloatAsState(if (shown) 1f else 0f, tween(160), label = "overlayAlpha")
     Box(
         Modifier
             .fillMaxSize()
-            .background(AppTheme.colors.scrim)
+            .background(AppTheme.colors.scrim.copy(alpha = AppTheme.colors.scrim.alpha * alpha))
             .clickable { onClose() },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.clickable(enabled = false) {}) { content() }
+        Box(
+            Modifier
+                .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
+                .clickable(enabled = false) {},
+        ) { content() }
     }
 }
 
