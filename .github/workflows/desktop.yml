@@ -62,15 +62,6 @@ jobs:
       - name: Install WiX Toolset 3
         run: choco install wixtoolset -y --no-progress
 
-      - name: Prepare WiX
-        shell: pwsh
-        run: |
-          .\gradlew.bat --no-daemon downloadWix unzipWix
-          $light = Get-ChildItem -Path build\compose -Recurse -Filter light.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $light) { throw "light.exe not found after downloadWix" }
-          Write-Host "WiX: $($light.DirectoryName)"
-          $light.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
       - name: Build MSI
         shell: pwsh
         run: |
