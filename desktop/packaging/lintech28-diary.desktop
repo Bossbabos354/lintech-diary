@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ЛинТех 28 — Дневник
+Comment=Электронный дневник
+Exec=/usr/lib/lintech28-diary/bin/lintech28-diary
+Icon=/usr/lib/lintech28-diary/lib/lintech28-diary.png
+Terminal=false
+Categories=Education;
+Keywords=дневник;школа;оценки;расписание;
+StartupNotify=true
