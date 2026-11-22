@@ -1,0 +1,25 @@
+# сборки
+build/
+.gradle/
+*/build/
+*/.gradle/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# артефакты и архивы версий
+*.apk
+*.aab
+*.zip
+versions/
+
+# промо и бэкапы
+promo/
+stable_debug/
+
+# служебное
+.DS_Store
+*.log

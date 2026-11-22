@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Загрузка версии | Админка ЛинТех 28</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+<div class="admin-shell">
+
+  <header class="admin-bar">
+    <a class="bar-brand" href="tools.html">ЛинТех&nbsp;28</a>
+    <span class="bar-title">Загрузка версии</span>
+    <div class="bar-right">
+      <a class="bar-btn" href="tools.html">Все инструменты</a>
+      <button class="bar-btn" id="logoutBtn" type="button">Выйти</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-head">
+      <div>
+        <h1>Загрузка новой версии</h1>
+        <p class="sub">APK сохранится как <b>SchoolDiary.apk</b>, а update.json обновится автоматически — приложение предложит обновление ученикам.</p>
+      </div>
+      <div class="head-actions">
+        <a class="btn secondary" href="tools.html">← Инструменты</a>
+      </div>
+    </div>
+
+    <div class="version-box">
+      <span class="lbl">Текущая версия</span>
+      <span class="val" id="ver">—</span>
+    </div>
+
+    <div class="msg" id="msg"></div>
+
+    <form class="panel" id="form" enctype="multipart/form-data" method="post" action="upload.php">
+      <h2>Новый файл</h2>
+
+      <label for="apk">APK-файл</label>
+      <input type="file" id="apk" name="apk" accept=".apk" required>
+
+      <label for="pw">Пароль администратора</label>
+      <input type="password" id="pw" name="password" placeholder="Пароль на загрузку" autocomplete="current-password" required>
+      <div class="hint">Пароль запомнится на этом устройстве и подставится в остальные инструменты.</div>
+
+      <label for="version">Номер версии</label>
+      <input type="text" id="version" name="version" placeholder="Например, 2.6.3" required>
+
+      <label for="notes">Что нового (кратко)</label>
+      <input type="text" id="notes" name="notes" placeholder="Например: виджеты с предпросмотром">
+
+      <div class="btns">
+        <button class="btn primary" type="submit">Загрузить версию</button>
+        <a class="btn secondary" href="tools.html">Отмена</a>
+      </div>
+    </form>
+
+    <p class="hint">Если пароль неверный, поле очистится — введите пароль заново.</p>
+  </main>
+
+  <footer class="admin-foot">
+    <span class="hud">© <span id="year">2026</span> ЛинТех 28 · Школа №28, Киров</span>
+    <span class="hud"><a href="index.html">На главную</a></span>
+  </footer>
+</div>
+
+<script src="admin-auth.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var msg = document.getElementById('msg');
+  var form = document.getElementById('form');
+  var pw = document.getElementById('pw');
+
+  AdminAuth.init({ input: 'pw', logout: 'logoutBtn' });
+
+  function show(text, ok) {
+    msg.className = 'msg ' + (ok ? 'ok' : 'err');
+    msg.textContent = text;
+  }
+
+  fetch('update.json', { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      document.getElementById('ver').textContent = (d && (d.versionName || '—')) || '—';
+    })
+    .catch(function () { document.getElementById('ver').textContent = 'ошибка'; });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!pw.value) { show('Введите пароль', false); return; }
+    AdminAuth.set(pw.value);
+
+    var fd = new FormData(form);
+    msg.className = 'msg';
+    msg.textContent = 'Загружаю…';
+
+    fetch('upload.php', { method: 'POST', body: fd })
+      .then(function (r) {
+        return r.json().catch(function () {
+          return { ok: false, message: 'Ошибка сервера (' + r.status + ')' };
+        });
+      })
+      .then(function (d) {
+        d = AdminAuth.checkResponse(d);
+        show(d.message || 'Готово', !!d.ok);
+        if (!d.ok) pw.value = AdminAuth.get();
+        if (d.ok) {
+          setTimeout(function () { location.reload(); }, 1400);
+        }
+      })
+      .catch(function () { show('Ошибка сети', false); });
+  });
+
+  var year = document.getElementById('year');
+  if (year) year.textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>

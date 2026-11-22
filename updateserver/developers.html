@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ЛинТех 28 — Для разработчиков</title>
+<meta name="description" content="Как устроен проект «ЛинТех 28 — Электронный дневник»: стек технологий, платформы, взаимодействие с API АВЕРС и история разработки.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital,wght@1,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<style>
+  /* ================= Шапка документа ================= */
+  .doc-hero { border-bottom: 1px solid var(--line); }
+  .back { display: inline-flex; align-items: center; gap: 8px; color: var(--faint); margin-bottom: 28px; transition: color .15s; }
+  .back:hover { color: var(--ink); }
+  .doc-hero h1 { margin-top: 16px; max-width: 48rem; }
+  .doc-hero .lead { margin-top: 16px; max-width: 40rem; }
+
+  /* ================= Теги ================= */
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag {
+    border: 1px solid var(--line); padding: 6px 10px; color: var(--muted);
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
+    letter-spacing: .1em; text-transform: uppercase;
+    transition: background-color .15s, color .15s, border-color .15s;
+  }
+  .tag:hover { background: var(--invert-bg); color: var(--invert-fg); border-color: transparent; }
+
+  /* ================= Строки «ключ → значение» ================= */
+  .kv { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .kv-row { background: var(--bg); display: grid; gap: 6px 20px; padding: 14px 20px; }
+  @media (min-width: 600px) { .kv-row { grid-template-columns: minmax(170px, 34%) 1fr; align-items: baseline; padding: 14px 24px; } }
+  .kv-row .k { font-family: var(--font-mono); font-size: 12px; letter-spacing: .02em; color: var(--ink); }
+  .kv-row .v { color: var(--muted); }
+
+  /* ================= Лента истории ================= */
+  .tl { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .tl-item { background: var(--bg); padding: 22px 20px; display: flex; gap: 16px; }
+  @media (min-width: 768px) { .tl-item { padding: 24px; } }
+  .tl-num { font-family: var(--font-mono); font-size: 11px; letter-spacing: .15em; color: transparent; -webkit-text-stroke: 1px var(--line-strong); flex-shrink: 0; padding-top: 3px; }
+  .tl-body h3 { font-size: 1.125rem; margin-bottom: 4px; }
+  .tl-body p { color: var(--muted); max-width: 44rem; }
+
+  .card p + .tags { margin-top: 4px; }
+  .doc-links { display: flex; flex-direction: column; gap: 12px; }
+  .doc-links a { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); transition: color .15s; }
+  .doc-links a:hover { color: var(--ink); }
+  .doc-links svg { width: 15px; height: 15px; }
+</style>
+</head>
+<body>
+
+<a class="skip" href="#top">К содержанию</a>
+
+<!-- ================= Шапка ================= -->
+<header class="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="index.html">
+      <img src="data:image/jpeg;base64,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" alt="Логотип ЛинТех 28">
+      <b>ЛинТех&nbsp;28</b>
+    </a>
+    <nav class="nav-links">
+      <a href="index.html#features">Возможности</a>
+      <a href="index.html#preview">Обзор</a>
+      <a href="index.html#howto">Установка</a>
+      <a href="developers.html" aria-current="page">Разработчикам</a>
+    </nav>
+    <div class="nav-right">
+      <button class="nav-cell" id="themeBtn" aria-label="Переключить тему" title="Сменить тему">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+      <a class="nav-cta" href="index.html#download">Скачать</a>
+    </div>
+  </div>
+</header>
+
+<!-- ================= Заголовок ================= -->
+<section class="doc-hero" id="top">
+  <div class="frame" style="border-top:0">
+    <span class="tick tl"></span><span class="tick tr"></span>
+    <div class="pad">
+      <a class="back hud" href="index.html">← На главную</a>
+      <span class="eyebrow hud" data-reveal>Для разработчиков</span>
+      <h1 data-reveal>Как сделан <span class="serif">проект</span></h1>
+      <p class="lead" data-reveal>Технологии, архитектура и история создания — от первой идеи до приложения под Android, iPhone и ПК.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 01 / Стек ================= -->
+<section id="stack">
+  <div class="frame">
+    <span class="rule" data-draw-rule></span>
+    <span class="tick tl"></span><span class="tick tr"></span>
+    <div class="pad">
+      <div class="sec-head" data-reveal>
+        <span class="eyebrow hud"><span class="num">01</span> / Стек технологий</span>
+        <h2>Из чего это <span class="serif">собрано</span></h2>
+        <p class="lead">Нативное приложение и веб-версия работают с одним и тем же API школьного журнала.</p>
+      </div>
+      <div class="tags" data-reveal>
+        <span class="tag">Kotlin 2.0</span>
+        <span class="tag">Jetpack Compose</span>
+        <span class="tag">Lumo UI</span>
+        <span class="tag">Compose BOM 2024.09</span>
+        <span class="tag">OkHttp</span>
+        <span class="tag">Gson</span>
+        <span class="tag">Coroutines</span>
+        <span class="tag">Android SDK 34</span>
+        <span class="tag">Gradle 8.9</span>
+        <span class="tag">AGP 8.4</span>
+        <span class="tag">HTML / CSS / JS</span>
+        <span class="tag">PHP (прокси)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 02 / Платформы ================= -->
+<section id="platforms">
+  <div class="frame">
+    <span class="rule" data-draw-rule></span>
+    <span class="tick tl"></span><span class="tick tr"></span>
+    <div class="pad">
+      <div class="sec-head" data-reveal>
+        <span class="eyebrow hud"><span class="num">02</span> / Платформы</span>
+        <h2>Одна логика — <span class="serif">три</span> платформы</h2>
+      </div>
+
+      <div class="hairgrid cols-3">
+        <article data-reveal>
+          <div class="card-head"><span class="lbl hud">Android</span><span class="idx hud">01</span></div>
+          <div class="card-body">
+            <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20"/><path d="M10 18h4"/></svg></div>
+            <h3>Нативное приложение</h3>
+            <p>Kotlin + Jetpack Compose, кастомная тема Lumo. Авторизация через Ext JS cookies, автообновления через <code>update.json</code>, сборка в APK.</p>
+          </div>
+        </article>
+
+        <article data-reveal>
+          <div class="card-head"><span class="lbl hud">Веб</span><span class="idx hud">02</span></div>
+          <div class="card-body">
+            <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg></div>
+            <h3>Веб-версия</h3>
+            <p>HTML, CSS и JS без сборки. Работает в браузере телефона и ПК, добавляется на домашний экран как иконка. Общается с журналом через небольшой PHP-прокси.</p>
+          </div>
+        </article>
+
+        <article data-reveal>
+          <div class="card-head"><span class="lbl hud">Простая версия</span><span class="idx hud">03</span></div>
+          <div class="card-body">
+            <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20"/><path d="M3 6h4M3 10h4M3 14h4M3 18h4M17 6h4M17 10h4M17 14h4M17 18h4"/></svg></div>
+            <h3>Для кнопочных телефонов</h3>
+            <p>Упрощённая страница с минимальным JS и чистым SHA-1 — работает на старых браузерах и кнопочных телефонах.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 03 / API ================= -->
+<section id="api">
+  <div class="frame">
+    <span class="rule" data-draw-rule></span>
+    <span class="tick tl"></span><span class="tick tr"></span>
+    <div class="pad">
+      <div class="sec-head" data-reveal>
+        <span class="eyebrow hud"><span class="num">03</span> / API</span>
+        <h2>Взаимодействие с <span class="serif">сервером</span></h2>
+        <p class="lead">Источник данных — АИАС АВЕРС (журнал <code>school28-kirov.ru</code>). Основные запросы:</p>
+      </div>
+
+      <div class="kv" data-reveal>
+        <div class="kv-row"><span class="k">POST /login</span><span class="v">Авторизация: логин и SHA-1 пароля</span></div>
+        <div class="kv-row"><span class="k">POST /auth</span><span class="v">Подтверждение сессии: userId и действие</span></div>
+        <div class="kv-row"><span class="k">GET_STUDENT_DAIRY</span><span class="v">Дневник: темы уроков, домашние задания и оценки по дням</span></div>
+        <div class="kv-row"><span class="k">GET_STUDENT_LESSONS</span><span class="v">Уроки и отметки за учебный год</span></div>
+        <div class="kv-row"><span class="k">GET_STUDENT_DIRECTOR_DATA</span><span class="v">Итоговые оценки по четвертям и полугодиям</span></div>
+        <div class="kv-row"><span class="k">GET_TIMETABLE</span><span class="v">Расписание уроков</span></div>
+        <div class="kv-row"><span class="k">GET_STUDENT_SUBJECTS</span><span class="v">Список предметов ученика</span></div>
+        <div class="kv-row"><span class="k">GET_PERSON_STORE_DATA</span><span class="v">Справочник учителей</span></div>
+        <div class="kv-row"><span class="k">GET_STUDENT_CLASS</span><span class="v">Класс ученика на текущий учебный год</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 04 / История ================= -->
+<section id="history">
+  <div class="frame">
+    <span class="rule" data-draw-rule></span>
+    <span class="tick tl"></span><span class="tick tr"></span>
+    <div class="pad">
+      <div class="sec-head" data-reveal>
+        <span class="eyebrow hud"><span class="num">04</span> / История</span>
+        <h2>От идеи до <span class="serif">приложения</span></h2>
+      </div>
+
+      <div class="tl">
+        <div class="tl-item" data-reveal>
+          <span class="tl-num">01</span>
+          <div class="tl-body">
+            <h3>Старт проекта</h3>
+            <p>Первая версия нативного Android-приложения для школы №28 города Кирова. Интерфейс на View-фрагментах и ViewPager2.</p>
+          </div>
+        </div>
+        <div class="tl-item" data-reveal>
+          <span class="tl-num">02</span>
+          <div class="tl-body">
+            <h3>Переход на Jetpack Compose</h3>
+            <p>Полная переработка интерфейса: фрагменты заменены на Compose-экраны, добавлена тема Lumo с кастомной палитрой.</p>
+          </div>
+        </div>
+        <div class="tl-item" data-reveal>
+          <span class="tl-num">03</span>
+          <div class="tl-body">
+            <h3>Сайт обновлений</h3>
+            <p>Лендинг на хостинге с защищённой админ-панелью загрузки и автообновлениями приложения.</p>
+          </div>
+        </div>
+        <div class="tl-item" data-reveal>
+          <span class="tl-num">04</span>
+          <div class="tl-body">
+            <h3>Веб-версии</h3>
+            <p>Клиент для iPhone и ПК на том же API, а также упрощённая страница для кнопочных телефонов.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 05 / Ссылки ================= -->
+<section id="links">
+  <div class="frame">
+    <span class="rule" data-draw-rule></span>
+    <span class="tick tl"></span><span class="tick tr"></span>
+    <div class="pad">
+      <div class="sec-head" data-reveal>
+        <span class="eyebrow hud"><span class="num">05</span> / Ссылки</span>
+        <h2>Где <span class="serif">посмотреть</span></h2>
+      </div>
+      <div class="doc-links" data-reveal>
+        <a href="index.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          Главная страница приложения
+        </a>
+        <a href="http://d91950hv.beget.tech/diary/index.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          Веб-версия дневника
+        </a>
+        <a href="http://d91950hv.beget.tech/diary/basic/index.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          Версия для кнопочных телефонов
+        </a>
+        <a href="https://journal.school28-kirov.ru">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+          Электронный журнал АВЕРС
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Футер ================= -->
+<footer>
+  <div class="frame" style="border-top:0">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <div class="logo-row">
+          <img src="data:image/jpeg;base64,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" alt="Логотип ЛинТех 28">
+          <b>ЛинТех&nbsp;28 — Дневник</b>
+        </div>
+        <p>Электронный дневник школы №28 города Кирова. Оценки, домашние задания и расписание из журнала АВЕРС.</p>
+      </div>
+      <div class="foot-col">
+        <h4 class="hud">Разделы</h4>
+        <ul>
+          <li><a href="index.html">Главная</a></li>
+          <li><a href="index.html#features">Возможности</a></li>
+          <li><a href="index.html#howto">Установка</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4 class="hud">Приложение</h4>
+        <ul>
+          <li><a href="index.html#download">Скачать для Android</a></li>
+          <li><a href="http://d91950hv.beget.tech/diary/index.html">Веб-версия</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span class="hud">© <span id="year">2026</span> ЛинТех 28 · Школа №28, Киров</span>
+      <span class="hud">Сделано для учеников и родителей</span>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+<script>
+(function(){
+  var yearEl = document.getElementById('year');
+  if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+  // ---- Тема (тот же ключ, что на главной) ----
+  var THEME_KEY = 'site-theme';
+  var root = document.documentElement;
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  function stored(){ try { return localStorage.getItem(THEME_KEY); } catch(e){ return null; } }
+  function apply(theme){
+    var dark = theme === 'dark' || (theme === 'system' && mq.matches);
+    root.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }
+  apply(stored() || 'system');
+  if (mq.addEventListener) mq.addEventListener('change', function(){ if(!stored() || stored()==='system') apply('system'); });
+  var themeBtn = document.getElementById('themeBtn');
+  if (themeBtn) themeBtn.addEventListener('click', function(){
+    var now = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(THEME_KEY, now); } catch(e){}
+    apply(now);
+  });
+
+  // ---- Появление по скроллу + прочерчивание линий ----
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reveals = document.querySelectorAll('[data-reveal]');
+  var rules = document.querySelectorAll('[data-draw-rule]');
+  if (reduce || !('IntersectionObserver' in window)) {
+    reveals.forEach(function(el){ el.classList.add('visible'); });
+    rules.forEach(function(el){ el.classList.add('visible'); });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+      });
+    }, { threshold: .12, rootMargin: '0px 0px -8% 0px' });
+    reveals.forEach(function(el){ io.observe(el); });
+    rules.forEach(function(el){ io.observe(el); });
+    window.setTimeout(function(){
+      document.querySelectorAll('.doc-hero [data-reveal]').forEach(function(el, i){
+        window.setTimeout(function(){ el.classList.add('visible'); }, i * 90);
+      });
+    }, 60);
+  }
+})();
+</script>
+</body>
+</html>

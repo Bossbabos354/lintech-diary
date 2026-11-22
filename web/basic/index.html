@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Дневник — простая версия</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; background:#fff; color:#000;
+         margin:0; padding:8px 10px 20px; font-size:15px; line-height:1.4; }
+  h1 { font-size:19px; margin:8px 0 4px; }
+  h2 { font-size:15px; margin:14px 0 4px; }
+  .muted { color:#555; font-size:13px; }
+  .nav { background:#eee; border-radius:8px; padding:6px; margin:8px 0; text-align:center; }
+  .nav a, .nav button { background:#7C4DFF; color:#fff; border:0; border-radius:8px;
+         padding:8px 14px; font-size:16px; text-decoration:none; cursor:pointer; margin:0 4px;
+         display:inline-block; }
+  .nav button { background:#555; }
+  .card { border:1px solid #ddd; border-radius:8px; padding:8px 10px; margin:6px 0; }
+  .day { font-weight:bold; color:#7C4DFF; margin:10px 0 2px; font-size:15px; }
+  .lesson { border-bottom:1px solid #eee; padding:5px 0; }
+  .subj { font-weight:bold; }
+  .mark { display:inline-block; font-weight:bold; padding:0 6px; border-radius:5px; }
+  input { width:100%; padding:9px; font-size:16px; border:1px solid #aaa;
+          border-radius:8px; margin:4px 0; box-sizing:border-box; }
+  button.big, a.big { display:block; width:100%; padding:12px; font-size:16px; color:#fff;
+          background:#7C4DFF; text-align:center; text-decoration:none; border:0;
+          border-radius:8px; margin:8px 0; cursor:pointer; }
+  a.big.link { background:#eee; color:#7C4DFF; font-weight:bold; }
+  .err { color:#c00; font-size:14px; margin-top:8px; }
+  .ok { color:#0a0; font-size:14px; margin-top:8px; }
+  .info { color:#555; font-size:13px; }
+  .hidden { display:none; }
+  hr { border:0; border-top:1px solid #ddd; margin:12px 0; }
+  .pe { border-top:3px solid #7C4DFF; margin-top:10px; padding-top:6px; }
+</style>
+</head>
+<body>
+
+<div id="loginBox">
+  <h1>Электронный дневник</h1>
+  <div class="info">Простая версия для кнопочных телефонов.</div>
+  <input type="text" id="fLogin" placeholder="Логин" value="">
+  <input type="password" id="fPass" placeholder="Пароль">
+  <button class="big" id="btnLogin">Войти</button>
+  <div class="err" id="loginMsg"></div>
+  <div class="info" style="margin-top:10px">Данные сохраняются в этом браузере в cookie. Чтобы очистить — снизу «Выход».</div>
+</div>
+
+<div id="appBox" class="hidden">
+  <div class="nav" id="nav">
+    <button id="bPrev">‹ Пред</button>
+    <button id="bNext">След ›</button>
+  </div>
+  <div class="nav" id="todayNav">
+    <a href="#" id="todayLink">Сегодня</a>
+  </div>
+  <h2 id="weekLabel">…</h2>
+  <div id="content"><div class="info">Загрузка…</div></div>
+  <hr>
+  <div class="nav">
+    <a href="#" id="goMarks">Оценки</a>
+    <a href="#" id="goToday">На неделю</a>
+  </div>
+  <div class="nav">
+    <button id="btnLogout">Выход</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- SHA-1 (чисто-JS, без crypto.subtle) ----
+  function sha1js(input) {
+    // UTF-8 bytes (ручная кодировка, TextEncoder может отсутствовать на старых)
+    var bytes = [];
+    var i, ch;
+    for (i = 0; i < input.length; i++) {
+      ch = input.charCodeAt(i);
+      if (ch < 0x80) { bytes.push(ch); }
+      else if (ch < 0x800) {
+        bytes.push(0xc0 | (ch >> 6), 0x80 | (ch & 0x3f));
+      } else if (ch < 0xd800 || ch >= 0xe000) {
+        bytes.push(0xe0 | (ch >> 12), 0x80 | ((ch >> 6) & 0x3f), 0x80 | (ch & 0x3f));
+      } else { // суррогатная пара
+        i++;
+        ch = 0x10000 + (((ch & 0x3ff) << 10) | (input.charCodeAt(i) & 0x3ff));
+        bytes.push(0xf0 | (ch >> 18), 0x80 | ((ch >> 12) & 0x3f), 0x80 | ((ch >> 6) & 0x3f), 0x80 | (ch & 0x3f));
+      }
+    }
+    var ml = bytes.length;
+    var blocks = ((ml + 8 >> 6) + 1) * 16;
+    var words = new Array(blocks);
+    for (i = 0; i < blocks; i++) words[i] = 0;
+    for (i = 0; i < ml; i++) words[i >> 2] |= (bytes[i] & 0xff) << (24 - (i % 4) * 8);
+    words[ml >> 2] |= 0x80 << (24 - (ml % 4) * 8);
+    words[blocks - 1] = ml * 8;
+
+    var a = 0x67452301, b = 0xEFCDAB89, c = 0x98BADCFE, d = 0x10325476, e = 0xC3D2E1F0;
+    var w = new Array(80);
+    var j, n, t;
+    for (i = 0; i < words.length; i += 16) {
+      for (j = 0; j < 16; j++) w[j] = words[i + j];
+      for (j = 16; j < 80; j++) {
+        n = w[j-3] ^ w[j-8] ^ w[j-14] ^ w[j-16];
+        w[j] = ((n << 1) | (n >>> 31)) >>> 0;
+      }
+      var A = a, B = b, C = c, D = d, E = e;
+      for (j = 0; j < 80; j++) {
+        var f, k;
+        if (j < 20) { f = (B & C) | ((~B) & D); k = 0x5A827999; }
+        else if (j < 40) { f = B ^ C ^ D; k = 0x6ED9EBA1; }
+        else if (j < 60) { f = (B & C) | (B & D) | (C & D); k = 0x8F1BBCDC; }
+        else { f = B ^ C ^ D; k = 0xCA62C1D6; }
+        t = (((A << 5) | (A >>> 27)) + f + E + k + w[j]) >>> 0;
+        E = D; D = C; C = ((B << 30) | (B >>> 2)) >>> 0; B = A; A = t;
+      }
+      a = (a + A) >>> 0; b = (b + B) >>> 0; c = (c + C) >>> 0;
+      d = (d + D) >>> 0; e = (e + E) >>> 0;
+    }
+    return [a, b, c, d, e].map(function(x){ return ('00000000'+x.toString(16)).slice(-8); }).join('');
+  }
+
+  // ---- jsEscape (как в приложении) ----
+  function jsEscape(s) {
+    var out = '';
+    for (var i = 0; i < s.length; i++) {
+      var code = s.charCodeAt(i);
+      if (code < 256) {
+        if (/[A-Za-z0-9*_\-./@]/.test(s[i])) out += s[i];
+        else out += '%' + code.toString(16).toUpperCase().padStart(2, '0');
+      } else {
+        out += '%u' + code.toString(16).toUpperCase().padStart(4, '0');
+      }
+    }
+    return out;
+  }
+  var encS = function(v){ return jsEscape('s:' + v); };
+  var encN = function(v){ return jsEscape('n:' + v); };
+
+  // ---- cookie хранилище ----
+  function setCookie(n, v, days) {
+    var d = new Date(); d.setDate(d.getDate() + (days || 90));
+    document.cookie = n + '=' + encodeURIComponent(v) + '; expires=' + d.toUTCString() + '; path=/';
+  }
+  function getCookie(n) {
+    var m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  function delCookie(n){ document.cookie = n + '=; Max-Age=-1; path=/'; }
+
+  var L = getCookie('b_login'), P = getCookie('b_pass');
+
+  // ---- глобальные переменные сессии ----
+  var sessUser = null, sessPass = null, sessUserId = null;
+  var studentId = -1, classId = -1, uchYear = 2026;
+  var weekOffset = 0;
+  var view = 'week'; // 'week' | 'marks'
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ---- XHR-запрос к proxy (синхронный вызов по callback, работает старый браузер) ----
+  function postProxy(postData, cb) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'proxy.php', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.timeout = 120000;
+    xhr.onreadystatechange = function(){
+      if (xhr.readyState === 4) {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { var d = JSON.parse(xhr.responseText); cb(d.ok ? d.text : null, d.ok ? null : (d.error||'Ошибка')); }
+          catch(e){ cb(null, 'Неверный ответ'); }
+        } else cb(null, 'HTTP ' + xhr.status);
+      }
+    };
+    xhr.ontimeout = function(){ cb(null, 'Таймаут'); };
+    xhr.onerror = function(){ cb(null, 'Нет сети'); };
+    xhr.send(JSON.stringify(postData));
+  }
+
+  function cookieHeader(endpoint) {
+    if (endpoint.indexOf('/act/') === -1) return '';
+    var p = [];
+    if (sessUser) p.push('ys-user=' + sessUser);
+    if (sessPass) p.push('ys-password=' + sessPass);
+    if (sessUserId) p.push('ys-userId=' + sessUserId);
+    return p.join('; ');
+  }
+
+  // ---- разбор new Date ----
+  function parseArray(json) {
+    var clean = json.replace(/new\s+Date\((\d{4}),(\d{1,2}),(\d{1,2})[^)]*\)/g,
+      function(m,y,mo,d){ var dt=new Date(+y,+mo,Math.max(+d,1));
+        return '"'+('0'+dt.getDate()).slice(-2)+'.'+('0'+(dt.getMonth()+1)).slice(-2)+'.'+y+'"'; });
+    try { var arr = JSON.parse(clean); return arr && arr.length ? arr : []; } catch(e){ return []; }
+  }
+
+  function ddmm(d) {
+    function p(x){ return ('0'+x).slice(-2); }
+    return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear();
+  }
+  function weekRange(off) {
+    var now = new Date();
+    var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    monday.setTime(monday.getTime() + off * 7 * 86400000);
+    var dow = monday.getDay(); if (dow === 0) dow = 7;
+    monday.setDate(monday.getDate() - (dow - 1));
+    monday.setHours(0,0,0,0);
+    var sunday = new Date(monday); sunday.setDate(sunday.getDate()+6);
+    sunday.setHours(23,59,59,999);
+    return { monday: monday, sunday: sunday };
+  }
+  function fmtWeek(monday, sunday) {
+    var f = new Intl.DateTimeFormat('ru-RU', {day:'numeric', month:'short'});
+    return f.format(monday) + ' — ' + f.format(sunday);
+  }
+
+  // ---- логин ----
+  $('btnLogin').onclick = function(){ doLogin(); };
+  function doLogin() {
+    var l = $('fLogin').value.trim();
+    var p = $('fPass').value;
+    $('loginMsg').innerHTML = '';
+    if (!l || !p) { $('loginMsg').textContent = 'Введите логин и пароль'; return; }
+    var hash = sha1js(p);
+    postProxy({ e:'/login', p:{ l:l, p:hash }, cookie:'' }, function(text, err){
+      if (err) { $('loginMsg').textContent = 'Ошибка: ' + err; return; }
+      var data = parseArray(text);
+      if (!data.length) { $('loginMsg').textContent = 'Неверный логин или пароль'; return; }
+      var row = data[0];
+      var uid = Number(row[0]);
+      studentId = Number(row[row.length-1]) || uid;
+      sessUser = encS(l); sessPass = encS(hash); sessUserId = encN(uid);
+      setCookie('b_login', l); setCookie('b_pass', p);
+      postProxy({ e:'/auth', p:{ uId:String(uid), act:'1' }, cookie:cookieHeader('/auth') }, function(){} );
+      // учебный год
+      postProxy({ e:'/act/get_uch_year', p:{ currentDate: ddmm(new Date()) }, cookie:cookieHeader('/act/get_uch_year') }, function(t2,err2){
+        if (t2) { var a=parseArray(t2); if (a.length) uchYear = parseInt(a[0][0],10) || uchYear; }
+        showApp();
+      });
+    });
+  }
+
+  // ---- показ приложения ----
+  function showApp() {
+    $('loginBox').classList.add('hidden');
+    $('appBox').classList.remove('hidden');
+    weekOffset = 0; view = 'week';
+    loadView();
+  }
+
+  // ---- загрузка текущего вида ----
+  function loadView() {
+    if (view === 'marks') loadMarks();
+    else loadWeek();
+  }
+
+  function ensureClass(next) {
+    if (classId !== -1) { next(); return; }
+    postProxy({ e:'/act/GET_STUDENT_CLASS', p:{ currentDate: ddmm(new Date()), student:String(studentId), uchYear:String(uchYear), uchId:'1' }, cookie:cookieHeader('/act/GET_STUDENT_CLASS') }, function(t,err){
+      if (!t) { $('content').innerHTML = '<div class="err">Ошибка класса</div>'; return; }
+      var a = parseArray(t);
+      if (a.length) classId = Number(a[0][0]);
+      next();
+    });
+  }
+
+  // ---- ДНЕВНИК на неделю ----
+  function loadWeek() {
+    $('content').innerHTML = '<div class="info">Загрузка…</div>';
+    ensureClass(function(){
+      var r = weekRange(weekOffset);
+      $('weekLabel').textContent = fmtWeek(r.monday, r.sunday);
+      // параллельно: предметы, дневник, учителя
+      var p1 = new Promise(function(res){ postProxy({ e:'/act/GET_DAIRY_CLASS_SUBJECTS', p:{pClassesIds:'', cls:String(classId)}, cookie:cookieHeader('/act/GET_DAIRY_CLASS_SUBJECTS') }, function(t){ res(t); }); });
+      var p2 = new Promise(function(res){ postProxy({ e:'/act/GET_STUDENT_DAIRY', p:{pClassesIds:'', student:String(studentId), cls:String(classId), begin_dt:ddmm(r.monday), end_dt:ddmm(r.sunday)}, cookie:cookieHeader('/act/GET_STUDENT_DAIRY') }, function(t){ res(t); }); });
+      var p3 = new Promise(function(res){ postProxy({ e:'/act/GET_PERSON_STORE_DATA', p:{uchId:'1'}, cookie:cookieHeader('/act/GET_PERSON_STORE_DATA') }, function(t){ res(t); }); });
+      Promise.all([p1,p2,p3]).then(function(res){
+        renderWeek(res[0], res[1], res[2]);
+      }).catch(function(){ $('content').innerHTML = '<div class="err">Ошибка загрузки</div>'; });
+    });
+  }
+
+  function renderWeek(subjRaw, dairyRaw, persRaw) {
+    var subjMap = {}, personMap = {};
+    parseArray(subjRaw).forEach(function(r){ subjMap[Number(r[0])] = r[1] || ''; });
+    parseArray(persRaw).forEach(function(r){ personMap[Number(r[0])] = r[1] || ''; });
+    var rows = parseArray(dairyRaw);
+    if (!rows.length) { $('content').innerHTML = '<div class="info">Нет данных за эту неделю</div>'; return; }
+
+    // группировка по локальному дню
+    var groups = {};
+    var order = [];
+    var i;
+    function parseDay(str) { var q=str.split('.'); return new Date(+q[2], +q[1]-1, +q[0]); }
+    for (i=0;i<rows.length;i++){
+      var dateStr = rows[i][0];
+      var key = String(dateStr);
+      if (!groups[key]) { groups[key] = []; order.push(key); }
+      groups[key].push(rows[i]);
+    }
+    order.sort(function(a,b){ return parseDay(a) - parseDay(b); });
+
+    var html = '';
+    for (i=0;i<order.length;i++){
+      var ds = order[i];
+      var d = parseDay(ds);
+      var dsLabel = d.toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long'});
+      html += '<div class="day">' + (dsLabel.charAt(0).toUpperCase()+dsLabel.slice(1)) + '</div>';
+      var arr = groups[ds];
+      for (var j=0;j<arr.length;j++){
+        var r = arr[j];
+        var subjId = Number(r[2]);
+        var subj = subjMap[subjId] || ('Предмет ' + subjId);
+        var theme = r[3] || '—';
+        var hw = r[4] || '';
+        var mark = r[5] || '';
+        var teacher = personMap[Number(r[9])||0] || '';
+        var mc = mark ? '<span class="mark" style="background:#eee;color:#c00">' + mark.replace('!','') + '</span> ' : '';
+        html += '<div class="lesson"><div class="subj">' + mc + esc(subj) + '</div>'
+              + '<div class="muted">' + esc(theme) + '</div>'
+              + (hw ? '<div class="muted">Д/з: ' + esc(hw) + '</div>' : '')
+              + (teacher ? '<div class="info">' + esc(teacher) + '</div>' : '')
+              + '</div>';
+      }
+    }
+    $('content').innerHTML = html;
+  }
+
+  // ---- ОЦЕНКИ (по предметам, средний балл) ----
+  function loadMarks() {
+    $('weekLabel').textContent = 'Оценки';
+    $('content').innerHTML = '<div class="info">Загрузка…</div>';
+    ensureClass(function(){
+      var now = new Date();
+      var ys = uchYear;
+      var sep = new Date(now.getFullYear(), 8, 1);
+      if (now < sep) ys = uchYear - 1;
+      var ye = ys + 1;
+      var P = [
+        new Promise(function(res){ postProxy({ e:'/act/GET_STUDENT_LESSONS', p:{cls:String(classId), parallelClasses:'', period_begin:'01.09.'+ys, period_end:'31.08.'+ye, student:String(studentId), uchYear:String(uchYear)}, cookie:cookieHeader('/act/GET_STUDENT_LESSONS') }, function(t){ res(t); }); }),
+        new Promise(function(res){ postProxy({ e:'/act/GET_STUDENT_JOURNAL_DATA', p:{cls:String(classId), parallelClasses:'', student:String(studentId)}, cookie:cookieHeader('/act/GET_STUDENT_JOURNAL_DATA') }, function(t){ res(t); }); }),
+        new Promise(function(res){ postProxy({ e:'/act/GET_STUDENT_DIRECTOR_DATA', p:{cls:String(classId), parallelClasses:'', student:String(studentId)}, cookie:cookieHeader('/act/GET_STUDENT_DIRECTOR_DATA') }, function(t){ res(t); }); }),
+        new Promise(function(res){ postProxy({ e:'/act/GET_STUDENT_SUBJECTS', p:{student:String(studentId), uchYear:String(uchYear), cls:String(classId)}, cookie:cookieHeader('/act/GET_STUDENT_SUBJECTS') }, function(t){ res(t); }); }),
+        new Promise(function(res){ postProxy({ e:'/act/GET_CLASS_TEACHERS_INFO', p:{student:String(studentId), uchYear:String(uchYear), cls:String(classId)}, cookie:cookieHeader('/act/GET_CLASS_TEACHERS_INFO') }, function(t){ res(t); }); })
+      ];
+      Promise.all(P).then(function(res){
+        renderMarks(res[0], res[1], res[2], res[3], res[4]);
+      }).catch(function(){ $('content').innerHTML='<div class="err">Ошибка</div>'; });
+    });
+  }
+
+  function renderMarks(lessRaw, markRaw, dirRaw, subjRaw, teacherRaw) {
+    var lessons = parseArray(lessRaw), marks = parseArray(markRaw), dirs = parseArray(dirRaw);
+    var subjects = parseArray(subjRaw), teachers = parseArray(teacherRaw);
+    var subjMarks = {};
+    var order = [];
+    subjects.forEach(function(r){
+      var id = Number(r[0]); if (isNaN(id)) return;
+      if (!subjMarks[id]) { subjMarks[id] = { name: r[1], marks: [] }; order.push(id); }
+    });
+    teachers.forEach(function(t){ var id=Number(t[0]); if (subjMarks[id]) subjMarks[id].mark = t[1]; });
+
+    lessons.forEach(function(l){
+      var sid = Number(l[14]); if (isNaN(sid) || !subjMarks[sid]) return;
+      var lid = Number(l[0]);
+      var markVal = '';
+      marks.forEach(function(m){ if (Number(m[4])===sid && Number(m[0])===lid) markVal = m[2] || ''; });
+      subjMarks[sid].marks.push(markVal);
+    });
+
+    var html = '<div class="day">Оценки за учебный год</div>';
+    var all = [];
+    order.forEach(function(id){
+      var s = subjMarks[id];
+      var numeric = s.marks.filter(function(x){ var n=parseInt(x,10); return !isNaN(n); }).map(Number);
+      if (!numeric.length) return;
+      numeric.forEach(function(n){ all.push(n); });
+      var sum = 0; numeric.forEach(function(n){ sum += n; });
+      var avg = sum / numeric.length;
+      var chips = s.marks.filter(function(x){ return x !== ''; }).join(' ');
+      html += '<div class="card"><div class="subj">' + esc(s.name) + '</div>'
+            + (s.mark ? '<div class="info">' + esc(s.mark) + '</div>' : '')
+            + '<div class="muted">Оценки: ' + esc(chips) + '</div>'
+            + '<div class="muted">Средний: <b>' + avg.toFixed(2).replace('.',',') + '</b></div>'
+            + '</div>';
+    });
+    if (!all.length) { $('content').innerHTML = '<div class="info">Нет оценок</div>'; return; }
+    var s2=0; all.forEach(function(n){ s2+=n; });
+    $('content').innerHTML = '<div class="pe"><b>Общий средний: ' + (s2/all.length).toFixed(2).replace('.',',') + '</b></div>' + html;
+  }
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ---- навигация ----
+  $('bPrev').onclick = function(){ if (view==='marks') return; weekOffset -= 1; loadWeek(); };
+  $('bNext').onclick = function(){ if (view==='marks') return; weekOffset += 1; loadWeek(); };
+  $('todayLink').onclick = function(e){ e.preventDefault(); weekOffset = 0; loadWeek(); };
+  $('goToday').onclick = function(e){ e.preventDefault(); view='week'; weekOffset=0; loadView(); };
+  $('goMarks').onclick = function(e){ e.preventDefault(); view='marks'; loadView(); };
+  $('btnLogout').onclick = function(){
+    delCookie('b_login'); delCookie('b_pass');
+    sessUser=sessPass=sessUserId=null; studentId=-1; classId=-1;
+    $('appBox').classList.add('hidden');
+    $('loginBox').classList.remove('hidden');
+    $('fPass').value='';
+  };
+
+  // ---- автологин из cookie ----
+  if (L && P) {
+    $('fLogin').value = L;
+    $('fPass').value = P;
+    var hash = sha1js(P);
+    sessUser = encS(L); sessPass = encS(hash); sessUserId = encN(-1);
+    // восстановим studentId через get_user_data? Нет — необходимости в studentId при cookie нет, но класс/год нужны.
+    // Попробуем сразу показать приложение, а studentId возьмём из сохранённого cookie (нет). 
+    // Поэтому сделаем повторный логин тихо.
+    postProxy({ e:'/login', p:{ l:L, p:hash }, cookie:'' }, function(text){
+      if (text) {
+        var data = parseArray(text);
+        if (data.length) {
+          var row = data[0];
+          var uid = Number(row[0]);
+          studentId = Number(row[row.length-1]) || uid;
+          sessUser = encS(L); sessPass = encS(hash); sessUserId = encN(uid);
+          postProxy({ e:'/auth', p:{ uId:String(uid), act:'1' }, cookie:cookieHeader('/auth') }, function(){});
+          postProxy({ e:'/act/get_uch_year', p:{ currentDate: ddmm(new Date()) }, cookie:cookieHeader('/act/get_uch_year') }, function(t2){
+            if (t2) { var a=parseArray(t2); if (a.length) uchYear = parseInt(a[0][0],10) || uchYear; }
+            showApp();
+          });
+        }
+      }
+    });
+  }
+})();
+</script>
+</body>
+</html>
