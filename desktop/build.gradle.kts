@@ -67,9 +67,9 @@ compose.desktop {
             targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi)
             packageName = "lintech28-diary"
             packageVersion = project.version.toString()
-            description = "Электронный дневник ЛинТех 28"
+            description = "Lintech 28 diary"
             vendor = "Linteh28"
-            copyright = "© 2026 ЛинТех 28"
+            copyright = "(c) 2026 Linteh28"
 
             linux {
                 installationPath = "/usr/lib"
@@ -78,7 +78,7 @@ compose.desktop {
                 debMaintainer = "diary@school28-kirov.ru"
             }
             windows {
-                menuGroup = "ЛинТех 28"
+                menuGroup = "Linteh28"
                 shortcut = true
                 dirChooser = true
             }
