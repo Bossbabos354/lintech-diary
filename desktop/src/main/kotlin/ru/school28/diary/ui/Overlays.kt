@@ -116,8 +116,8 @@ fun GoalOverlay(
     var targetMark by remember { mutableStateOf(existing?.targetMark ?: 5) }
     var allowedMarks by remember { mutableStateOf((existing?.allowedMarks ?: listOf(5)).toSet()) }
 
-    val currentMarks = remember(periodKey, subject) { GoalMath.marksFor(subject, periodKey) }
-    val avg = remember(currentMarks) { GoalMath.average(currentMarks) }
+    val currentMarks = remember(periodKey, subject) { GoalMath.marksForLessons(subject, periodKey) }
+    val avg = remember(currentMarks) { GoalMath.weightedAverage(currentMarks) }
     val needed = remember(currentMarks, targetMark, allowedMarks) {
         GoalMath.needed(currentMarks, targetMark, allowedMarks.toList())
     }
@@ -152,7 +152,7 @@ fun GoalOverlay(
                     Text("Оценок за этот период нет", color = AppTheme.colors.textSecondary, fontSize = 14.sp)
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        currentMarks.forEach { MarkChip(it.toString(), 14) }
+                        currentMarks.forEach { MarkChip(it.mark, 14) }
                     }
                     Spacer(Modifier.height(8.dp))
                     val avgText = if (avg == null) "—" else String.format(Locale("ru"), "%.2f", avg)
@@ -304,8 +304,8 @@ fun WeeklyOverlay(onClose: () -> Unit) {
     }
     val rated = remember(subjects) {
         subjects.mapNotNull { s ->
-            val values = s.marks.mapNotNull { it.mark.toIntOrNull() }
-            if (values.size < 2) null else s to (values.sum().toDouble() / values.size)
+            val avg = GoalMath.currentPeriodAverage(s) ?: return@mapNotNull null
+            s to avg
         }
     }
     val best = remember(rated) { rated.maxByOrNull { it.second } }

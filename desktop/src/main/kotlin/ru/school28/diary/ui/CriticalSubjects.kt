@@ -1,6 +1,7 @@
 package ru.school28.diary.ui
 
 import ru.school28.diary.api.SubjectMarks
+import androidx.compose.runtime.Immutable
 import java.util.Locale
 
 /**
@@ -10,6 +11,7 @@ import java.util.Locale
  *  • средний балл ниже 3,5 (тянет на «3» и хуже);
  *  • три и больше «2».
  */
+@Immutable
 data class CriticalSubject(
     val subjectId: Int,
     val subjectName: String,
@@ -30,13 +32,13 @@ object CriticalSubjects {
     /** Сколько «2» делают предмет критическим. */
     const val TWOS_LIMIT = 3
 
-    fun find(subjects: List<SubjectMarks>, periodKey: String = "YEAR"): List<CriticalSubject> =
+    fun find(subjects: List<SubjectMarks>): List<CriticalSubject> =
         subjects.mapNotNull { subject ->
-            val marks = GoalMath.marksFor(subject, periodKey)
+            val marks = GoalMath.currentPeriodLessons(subject)
             if (marks.isEmpty()) return@mapNotNull null
 
-            val avg = GoalMath.average(marks)
-            val twos = marks.count { it <= 2 }
+            val avg = GoalMath.weightedAverage(marks)
+            val twos = marks.count { (it.mark.toIntOrNull() ?: 5) <= 2 }
             val reasons = mutableListOf<String>()
 
             if (avg != null && avg < AVG_LIMIT) {

@@ -3,6 +3,7 @@ package ru.school28.diary.ui
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import ru.school28.diary.Settings
+import ru.school28.diary.api.LessonMarks
 import ru.school28.diary.api.SubjectMarks
 import java.util.Locale
 import kotlin.math.ceil
@@ -71,7 +72,8 @@ object GoalStore {
 }
 
 object GoalMath {
-    /** Порог среднего балла для оценки 5/4/3. */
+
+    /** Порог среднего балла для оценки 5/4/3 (стандартное школьное округление). */
     fun threshold(target: Int): Double = when (target) {
         5 -> 4.5
         4 -> 3.5
@@ -79,17 +81,57 @@ object GoalMath {
         else -> 1.5
     }
 
-    fun marksFor(subject: SubjectMarks, periodKey: String): List<Int> {
+    /** Оценки предмета за период вместе с весами (вес задаёт учитель). */
+    fun marksForLessons(subject: SubjectMarks, periodKey: String): List<LessonMarks> {
         val period = GoalPeriods.byKey(periodKey)
         val withPeriod = subject.marks.filter { it.periodId != null }
-        val filtered = if (period.quarterIds.isEmpty() || withPeriod.isEmpty()) {
+        val filtered = if (period.quarterIds.isEmpty()) {
+            subject.marks
+        } else if (withPeriod.isEmpty()) {
             subject.marks
         } else {
-            subject.marks.filter { it.periodId in period.quarterIds }
+            val inPeriod = subject.marks.filter { it.periodId in period.quarterIds }
+            if (inPeriod.isNotEmpty()) inPeriod else subject.marks
         }
-        return filtered.mapNotNull { it.mark.toIntOrNull() }
+        return filtered.filter { it.mark.toIntOrNull() != null }
     }
 
+    fun marksFor(subject: SubjectMarks, periodKey: String): List<Int> =
+        marksForLessons(subject, periodKey).mapNotNull { it.mark.toIntOrNull() }
+
+    /** Вес оценки в журнале; если учитель его не задал — 1. */
+    fun weightOf(lesson: LessonMarks): Double = lesson.weight?.takeIf { it > 0.0 } ?: 1.0
+
+    /** Средневзвешенный балл — так его считает сам журнал. */
+    fun weightedAverage(lessons: List<LessonMarks>): Double? {
+        var sum = 0.0
+        var totalWeight = 0.0
+        for (lesson in lessons) {
+            val mark = lesson.mark.toIntOrNull() ?: continue
+            val weight = weightOf(lesson)
+            sum += mark * weight
+            totalWeight += weight
+        }
+        return if (totalWeight == 0.0) null else sum / totalWeight
+    }
+
+    /** Период последней оценки — текущая четверть/полугодие. */
+    fun currentPeriodId(subject: SubjectMarks): Int? =
+        subject.marks.filter { it.periodId != null }
+            .maxByOrNull { it.date?.time ?: Long.MIN_VALUE }
+            ?.periodId
+
+    /** Оценки текущего периода; если периодов нет — все оценки. */
+    fun currentPeriodLessons(subject: SubjectMarks): List<LessonMarks> {
+        val all = subject.marks.filter { it.mark.toIntOrNull() != null }
+        val id = currentPeriodId(subject) ?: return all
+        return all.filter { it.periodId == id }.ifEmpty { all }
+    }
+
+    fun currentPeriodAverage(subject: SubjectMarks): Double? =
+        weightedAverage(currentPeriodLessons(subject))
+
+    /** Простое среднее — для рядов без весов (оценки за неделю). */
     fun average(marks: List<Int>): Double? =
         if (marks.isEmpty()) null else marks.sum().toDouble() / marks.size
 
@@ -101,22 +143,29 @@ object GoalMath {
         else -> 2
     }
 
-    /** Сколько оценок ещё нужно, чтобы средний дошёл до порога. null — недостижимо. */
-    fun needed(marks: List<Int>, target: Int, allowedMarks: List<Int>): Int? {
+    /** Сколько ещё оценок нужно; новая оценка добавляется с весом 1. */
+    fun needed(lessons: List<LessonMarks>, target: Int, allowedMarks: List<Int>): Int? {
         if (allowedMarks.isEmpty()) return null
         val t = threshold(target)
-        val n = marks.size
-        val sum = marks.sum().toDouble()
-        if (n > 0 && sum / n >= t) return 0
-        if (n == 0 && t <= 0) return 0
+        var sum = 0.0
+        var totalWeight = 0.0
+        for (lesson in lessons) {
+            val mark = lesson.mark.toIntOrNull() ?: continue
+            val weight = weightOf(lesson)
+            sum += mark * weight
+            totalWeight += weight
+        }
+        if (totalWeight > 0.0 && sum / totalWeight >= t) return 0
+        if (totalWeight == 0.0 && t <= 0) return 0
         val best = allowedMarks.maxOrNull() ?: return null
         if (best < t) return null
-        return ceil((t * n - sum) / (best - t)).toInt().coerceAtLeast(1)
+        val k = kotlin.math.ceil((t * totalWeight - sum) / (best - t)).toInt()
+        return k.coerceAtLeast(1)
     }
 
-    fun hint(marks: List<Int>, goal: Goal): String {
-        val need = needed(marks, goal.targetMark, goal.allowedMarks)
-        val avg = average(marks)
+    fun hint(lessons: List<LessonMarks>, goal: Goal): String {
+        val need = needed(lessons, goal.targetMark, goal.allowedMarks)
+        val avg = weightedAverage(lessons)
         val avgText = if (avg == null) "нет оценок" else String.format(Locale("ru"), "%.2f", avg)
         return when {
             need == null -> "С набором ${goal.allowedMarks.joinToString("/")} цели не достичь"

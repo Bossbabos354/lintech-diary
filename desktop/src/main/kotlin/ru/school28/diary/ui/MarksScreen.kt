@@ -66,12 +66,8 @@ fun MarksScreen(state: AppState) {
         loading = false
     }
 
-    val numericMarks = remember(subjects) {
-        subjects.flatMap { it.marks }.mapNotNull { it.mark.toIntOrNull() }
-    }
-    val overallAvg = remember(numericMarks) {
-        if (numericMarks.isEmpty()) null else numericMarks.sum().toDouble() / numericMarks.size
-    }
+    val periodLessons = remember(subjects) { subjects.flatMap { GoalMath.currentPeriodLessons(it) } }
+    val overallAvg = remember(periodLessons) { GoalMath.weightedAverage(periodLessons) }
     val sorted = remember(subjects) { subjects.sortedBy { it.subjectName } }
 
     Column(Modifier.fillMaxSize()) {
@@ -158,7 +154,7 @@ private fun OverallCard(avg: Double?) {
 private fun SubjectCard(subject: SubjectMarks, onClick: () -> Unit) {
     val goal = remember(subject.subjectId) { GoalStore.find(subject.subjectId, "YEAR") }
     val goalHint = remember(goal, subject) {
-        goal?.let { GoalMath.hint(GoalMath.marksFor(subject, it.periodKey), it) }
+        goal?.let { GoalMath.hint(GoalMath.marksForLessons(subject, it.periodKey), it) }
     }
     val marks = remember(subject) {
         subject.marks.filter { it.mark.isNotEmpty() }.sortedBy { it.date?.time ?: 0L }.takeLast(20)
@@ -179,7 +175,7 @@ private fun SubjectCard(subject: SubjectMarks, onClick: () -> Unit) {
                 "$name: $m"
             }
     }
-    val numeric = remember(subject) { subject.marks.mapNotNull { it.mark.toIntOrNull() } }
+    val avg = remember(subject) { GoalMath.currentPeriodAverage(subject) }
 
     Column(
         Modifier
@@ -199,9 +195,9 @@ private fun SubjectCard(subject: SubjectMarks, onClick: () -> Unit) {
                     Text(it, color = AppTheme.colors.textSecondary, fontSize = 12.sp)
                 }
             }
-            if (numeric.isNotEmpty()) {
+            if (avg != null) {
                 Text(
-                    String.format(Locale("ru"), "%.2f", numeric.sum().toDouble() / numeric.size),
+                    String.format(Locale("ru"), "%.2f", avg),
                     color = AppTheme.colors.text,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 18.sp,

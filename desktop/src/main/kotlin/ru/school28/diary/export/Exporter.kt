@@ -10,6 +10,7 @@ import ru.school28.diary.AppPaths
 import ru.school28.diary.api.DairyEntry
 import ru.school28.diary.api.SchoolSchedule
 import ru.school28.diary.api.SubjectMarks
+import ru.school28.diary.ui.GoalMath
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -82,9 +83,8 @@ object Exporter {
             if (marks.isNotEmpty()) {
                 writer.text("Оценки", 15f, gap = 8f)
                 marks.sortedBy { it.subjectName }.forEach { s ->
-                    val numeric = s.marks.mapNotNull { it.mark.toIntOrNull() }
-                    val avg = if (numeric.isEmpty()) "—"
-                    else String.format(Locale("ru"), "%.2f", numeric.sum().toDouble() / numeric.size)
+                    val avgValue = GoalMath.currentPeriodAverage(s)
+                    val avg = avgValue?.let { String.format(Locale("ru"), "%.2f", it) } ?: "—"
                     writer.text("${s.subjectName} — средний $avg", 11f, gap = 3f)
                     val totals = s.totalMarks.entries.sortedBy { it.key }
                         .joinToString(", ") { (p, m) -> "${periodLabel(p)}: $m" }
@@ -194,9 +194,8 @@ object Exporter {
 
         addRow(listOf("Предмет", "Средний балл", "Итоговые", "Оценки"))
         marks.sortedBy { it.subjectName }.forEach { s ->
-            val numeric = s.marks.mapNotNull { it.mark.toIntOrNull() }
-            val avg = if (numeric.isEmpty()) "—"
-            else String.format(Locale("ru"), "%.2f", numeric.sum().toDouble() / numeric.size)
+            val avgValue = GoalMath.currentPeriodAverage(s)
+            val avg = avgValue?.let { String.format(Locale("ru"), "%.2f", it) } ?: "—"
             val totals = s.totalMarks.entries.sortedBy { it.key }
                 .joinToString(", ") { (p, m) -> "${periodLabel(p)}: $m" }
             val list = s.marks.filter { it.mark.isNotBlank() }

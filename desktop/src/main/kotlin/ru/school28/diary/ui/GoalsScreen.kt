@@ -164,7 +164,7 @@ private fun GoalCard(
     onDelete: () -> Unit,
 ) {
     val marks = remember(subject, goal.periodKey) {
-        if (subject == null) emptyList() else GoalMath.marksFor(subject, goal.periodKey)
+        if (subject == null) emptyList() else GoalMath.marksForLessons(subject, goal.periodKey)
     }
     val hint = remember(marks, goal) {
         if (subject == null) "Нет данных об оценках" else GoalMath.hint(marks, goal)
