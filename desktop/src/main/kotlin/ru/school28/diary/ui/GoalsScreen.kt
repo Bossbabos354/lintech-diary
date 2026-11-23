@@ -102,7 +102,7 @@ fun GoalsScreen(state: AppState) {
         }
 
         when {
-            loading -> LoadingBox()
+            loading && goals.isEmpty() -> LoadingBox()
             goals.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
                     Icon(
