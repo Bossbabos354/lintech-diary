@@ -70,6 +70,7 @@ fun SettingsScreen(state: AppState) {
     var selectedClass by remember { mutableStateOf(Settings.selectedClass) }
     var classes by remember { mutableStateOf<List<String>>(emptyList()) }
     var working by remember { mutableStateOf(false) }
+    var updateUrl by remember { mutableStateOf<String?>(null) }
     var exporting by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -385,9 +386,9 @@ fun SettingsScreen(state: AppState) {
                                 val result = UpdateChecker.check()
                                 working = false
                                 val update = result.update
-                                if (update != null) UpdateChecker.open(update.url)
+                                updateUrl = update?.url
                                 state.toast = when {
-                                    update != null -> "Доступна версия ${update.versionName} — открыл страницу загрузки"
+                                    update != null -> "Доступна версия ${update.versionName}"
                                     result.error != null -> result.error
                                     else -> "Обновлений нет"
                                 }
@@ -398,6 +399,16 @@ fun SettingsScreen(state: AppState) {
                     shape = RoundedCornerShape(14.dp),
                 ) {
                     Text(if (working) "Проверяю…" else "Проверить обновления")
+                }
+                updateUrl?.let { url ->
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { UpdateChecker.open(url) },
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text("На сайт")
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(

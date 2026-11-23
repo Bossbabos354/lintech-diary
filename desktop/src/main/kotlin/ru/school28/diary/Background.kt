@@ -291,7 +291,7 @@ object Notifier {
                 append("\n")
                 append(update.notes.take(200))
             }
-            append("\nОбновление — в настройках приложения")
+            append("\nСсылка: ${update.url}")
         }
         Tray.notify("Доступно обновление", text)
     }
