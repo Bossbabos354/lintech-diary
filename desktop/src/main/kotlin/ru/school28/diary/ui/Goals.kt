@@ -1,10 +1,14 @@
 package ru.school28.diary.ui
 
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.InstanceCreator
 import com.google.gson.reflect.TypeToken
+import ru.school28.diary.AppLog
 import ru.school28.diary.Settings
 import ru.school28.diary.api.LessonMarks
 import ru.school28.diary.api.SubjectMarks
+import java.lang.reflect.Type
 import java.util.Locale
 import kotlin.math.ceil
 
@@ -41,14 +45,25 @@ object GoalPeriods {
 }
 
 object GoalStore {
-    private val gson = Gson()
+    // Gson на JDK 21 не может создать data-класс без no-args конструктора.
+    private val gson: Gson = GsonBuilder()
+        .registerTypeAdapter(
+            Goal::class.java,
+            object : InstanceCreator<Goal> {
+                override fun createInstance(type: Type) = Goal(0, "", "", 0, emptyList())
+            },
+        )
+        .create()
 
     fun load(): List<Goal> {
-        val raw = Settings.goalsJson ?: return emptyList()
+        Settings.reload()
+        val raw = Settings.goalsJson
+        if (raw == null) return emptyList()
         return try {
             val type = object : TypeToken<List<Goal>>() {}.type
             gson.fromJson<List<Goal>>(raw, type).orEmpty()
         } catch (e: Exception) {
+            AppLog.logException("goals/load", e)
             emptyList()
         }
     }

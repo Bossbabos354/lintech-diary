@@ -42,17 +42,30 @@ object Settings {
 
     private val props = Properties()
     private var loaded = false
+    private var settingsFile: File? = null
 
     @Synchronized
     fun init() {
         if (loaded) return
         AppPaths.ensureDirs()
         val file = AppPaths.settingsFile
+        settingsFile = file
         if (file.exists()) {
             runCatching { file.inputStream().use(props::load) }
                 .onFailure { AppLog.logException("settings/load", it) }
         }
         loaded = true
+    }
+
+    /** Перечитывает файл: другой экземпляр приложения мог сохранить цели. */
+    @Synchronized
+    fun reload() {
+        val file = settingsFile ?: return
+        if (!file.exists()) return
+        runCatching {
+            props.clear()
+            file.inputStream().use(props::load)
+        }.onFailure { AppLog.logException("settings/reload", it) }
     }
 
     private fun save() {
