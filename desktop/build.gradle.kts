@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "ru.school28"
-version = "3.0.0"
+version = "3.0.1"
 
 dependencies {
     implementation(compose.desktop.currentOs)

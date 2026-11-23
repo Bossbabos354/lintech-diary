@@ -99,7 +99,12 @@ jobs:
       - name: Read version
         id: version
         run: |
-          VERSION=$(grep -m1 '^version = ' desktop/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          # По тегу (релиз Android 3.x) версию берём из тега, иначе — из build.gradle.kts.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(grep -m1 '^version = ' desktop/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: actions/download-artifact@v4
@@ -119,3 +124,5 @@ jobs:
           files: artifacts/**/*
           fail_on_unmatched_files: false
           generate_release_notes: true
+          # Тег создаётся вместе с Android-релизом: не затираем его описание.
+          append_body: true
