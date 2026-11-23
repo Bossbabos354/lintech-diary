@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SchoolDiary" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/primary_dark</item>
+        <item name="cardBackground">@drawable/bg_card_outline_light</item>
+        <item name="dashedDivider">@drawable/divider_dashed_light</item>
+    </style>
+
+    <style name="Theme.SchoolDiary.Light" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/primary_dark</item>
+        <item name="cardBackground">@drawable/bg_card_outline_light</item>
+        <item name="dashedDivider">@drawable/divider_dashed_light</item>
+    </style>
+
+    <style name="Theme.SchoolDiary.Dark" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/primary_dark</item>
+        <item name="cardBackground">@drawable/bg_card_outline_dark</item>
+        <item name="dashedDivider">@drawable/divider_dashed_dark</item>
+    </style>
+</resources>

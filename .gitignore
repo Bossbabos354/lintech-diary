@@ -1,14 +1,26 @@
-# В репозиторий входят только десктопное приложение и CI.
-# Android-проект, APK, архивы версий и серверные скрипты остаются локально.
-/*
-!/.gitignore
-!/README.md
-!/desktop/
-!/.github/
+# Сборка и локальные файлы
+build/
+.gradle/
+.kotlin/
+.idea/
+.vscode/
+local.properties
+*.apk
+*.aab
 
-# артефакты сборки и локальные файлы desktop
-desktop/build/
-desktop/.gradle/
-desktop/.kotlin/
-desktop/.idea/
-desktop/local.properties
+# Архивы, старые копии и серверные скрипты
+*.zip
+/versions/
+/updateserver/
+/stable_debug/
+/web/
+/ios-port/
+/design/
+*.figcraft
+
+# Скриншоты и макеты в корне
+/*.jpg
+/*.png
+
+.gigatool/
+.pi-workflow/
