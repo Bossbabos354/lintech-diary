@@ -521,7 +521,7 @@ function renderSearch() {
 }
 
 // ---------------- Расписание ----------------
-const SCHEDULE_URLS = ['http://d91950hv.beget.tech/schedule.json', '../schedule.json', '/schedule.json'];
+const SCHEDULE_URLS = ['data/schedule.json', 'schedule.json'];
 const SCHEDULE_DAYS = [
   { key: 'mon', short: 'Пн', full: 'понедельник' },
   { key: 'tue', short: 'Вт', full: 'вторник' },
@@ -1057,7 +1057,7 @@ function openGoalSheet(subject, initialPeriodKey) {
 }
 
 // ---------------- Экран «События» ----------------
-const EVENTS_URLS = ['http://d91950hv.beget.tech/events.json', '../events.json', '/events.json'];
+const EVENTS_URLS = ['data/events.json', 'events.json'];
 
 async function fetchEvents() {
   let lastErr = null;
