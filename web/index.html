@@ -334,16 +334,35 @@
 
 <script src="site.js"></script>
 <script>
+var RELEASES_URL = 'https://github.com/Bossbabos354/lintech-diary/releases';
+var RELEASES_API = 'https://api.github.com/repos/Bossbabos354/lintech-diary/releases/latest';
+
 function applyVersion(d){
   var v = (d && d.versionName) || '—';
-  var u = (d && d.apkUrl) || '#';
+  var u = (d && d.apkUrl) || RELEASES_URL;
   var dv = document.getElementById('dlVer'); if (dv) dv.textContent = v;
-  var db = document.getElementById('dlBtn'); if (db) db.href = u;
+  var db = document.getElementById('dlBtn');
+  if (db) { db.href = u; db.target = '_blank'; db.rel = 'noopener'; }
 }
 fetch('update.json', { cache: 'no-store' })
   .then(function(r){ return r.json(); })
   .then(applyVersion)
-  .catch(function(){ applyVersion(null); });
+  .catch(function(){
+    var db = document.getElementById('dlBtn');
+    if (db) db.href = RELEASES_URL;
+  });
+
+// Ссылку на APK берём из последнего релиза, чтобы кнопка не ломалась
+// при смене версии.
+fetch(RELEASES_API, { cache: 'no-store' })
+  .then(function(r){ return r.ok ? r.json() : null; })
+  .then(function(j){
+    if (!j) return;
+    var apk = (j.assets || []).filter(function(a){ return /\.apk$/i.test(a.name); })[0];
+    var db = document.getElementById('dlBtn');
+    if (apk && db) db.href = apk.browser_download_url;
+  })
+  .catch(function(){});
 
 (function(){
   var yearEl = document.getElementById('year');
