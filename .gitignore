@@ -24,3 +24,8 @@ local.properties
 
 .gigatool/
 .pi-workflow/
+
+# подпись
+signing.properties
+*.keystore
+*.jks
