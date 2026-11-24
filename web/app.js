@@ -5,7 +5,8 @@
  */
 const Diary = (() => {
   const BASE_URL = 'https://journal.school28-kirov.ru';
-  const PROXY = 'proxy.php';
+  // Адрес прокси: proxy.php на Beget или Worker на Cloudflare
+  const PROXY = window.LINTECH_PROXY || 'proxy.php';
 
   // ---- JS escape() — Ext JS CookieProvider encodeValue ----
   function jsEscape(s) {
