@@ -72,7 +72,6 @@ import ru.school28.diary.ui.screens.DaySummaryScreen
 import ru.school28.diary.ui.screens.EventsScreen
 import ru.school28.diary.ui.screens.GoalSheet
 import ru.school28.diary.ui.screens.GoalsScreen
-import ru.school28.diary.ui.screens.HomeScreen
 import ru.school28.diary.ui.screens.LessonSheet
 import ru.school28.diary.ui.screens.MarksScreen
 import ru.school28.diary.ui.screens.ScheduleScreen
@@ -135,13 +134,6 @@ class MainActivity : ComponentActivity() {
         // Протяжка дневника: 0 — свёрнуто, 1 — обновление запущено.
         // Прогресс приходит покадрово из DairyScreen, своей анимации не нужно.
         var pullProgress by remember { mutableFloatStateOf(0f) }
-        // Главная открывается при старте; из неё уходим в разделы кружками.
-        var showHome by remember { mutableStateOf(true) }
-        val homeName = remember { Prefs.getFio(ctx).orEmpty() }
-        val badges = remember(unread) {
-            NotificationStore.load(ctx).filter { !it.read }.groupBy { it.tab }.mapValues { it.value.size }
-        }
-
         // Сохраняем состояние экранов (скролл, фильтры) между переключениями вкладок.
         val screenState = rememberSaveableStateHolder()
 
@@ -163,7 +155,6 @@ class MainActivity : ComponentActivity() {
                     .fillMaxSize()
                     .statusBarsPadding()
             ) {
-                if (!showHome) {
                 // Полоса, которая открывается, когда панель уезжает вниз.
                 Box(
                     Modifier
@@ -182,21 +173,9 @@ class MainActivity : ComponentActivity() {
                     },
                     onSettings = { settingsOpen = true },
                     unread = unread,
-                    onHome = { showHome = true },
                 )
-                }
 
                 Box(Modifier.weight(1f)) {
-                    if (showHome) {
-                        HomeScreen(
-                            name = homeName,
-                            badges = badges,
-                            onOpen = {
-                                tab = it
-                                showHome = false
-                            },
-                        )
-                    } else {
                     AnimatedContent(
                         targetState = tab,
                         transitionSpec = {
@@ -247,12 +226,11 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                    }
                 }
             }
 
             AnimatedVisibility(
-                visible = !settingsOpen && !showHome,
+                visible = !settingsOpen,
                 enter = fadeIn(tween(200)),
                 exit = fadeOut(tween(160)),
                 modifier = Modifier.align(Alignment.BottomCenter),
