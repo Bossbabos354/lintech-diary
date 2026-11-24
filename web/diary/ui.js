@@ -51,6 +51,13 @@ function toast(msg) {
 }
 
 // ---------------- хранилище ----------------
+function lsGetJson(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+}
+function lsSetJson(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
 const Prefs = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
@@ -117,6 +124,11 @@ function back() {
   go({ screen: S.route.tab || 'dairy' });
 }
 
+function schoolYearNow() {
+  const n = new Date();
+  return n.getMonth() >= 8 ? n.getFullYear() : n.getFullYear() - 1;
+}
+
 // ---------------- данные ----------------
 async function ensureClass() {
   let cid = Prefs.classId();
@@ -171,13 +183,35 @@ function recordNewMarks(subjects) {
   Prefs.set('lt_seen_marks', JSON.stringify(now.slice(-2000)));
 }
 
+function reviveSubjects(list) {
+  return (list || []).map((s) => ({
+    ...s,
+    marks: (s.marks || []).map((m) => ({
+      ...m,
+      date: m.date ? new Date(m.date) : null,
+    })),
+  }));
+}
+
 async function loadSubjects(force) {
-  const fresh = Date.now() - S.subjectsAt < 60_000;
+  if (!S.subjects) {
+    const cached = lsGetJson('lt_marks_cache', null);
+    if (cached && Array.isArray(cached.data)) {
+      S.subjects = reviveSubjects(cached.data);
+      S.subjectsAt = cached.at || 0;
+    }
+  }
+  const fresh = Date.now() - S.subjectsAt < 10 * 60 * 1000;
   if (S.subjects && fresh && !force) return S.subjects;
   const cid = await ensureClass();
+  const had = S.subjects;
   S.subjects = await Diary.getMarks(cid, Prefs.studentId(), Prefs.uchYear());
   S.subjectsAt = Date.now();
+  lsSetJson('lt_marks_cache', { at: S.subjectsAt, data: S.subjects });
   try { recordNewMarks(S.subjects); } catch (e) {}
+  if (had && !force) {
+    if (S.route.screen === 'marks' || S.route.screen === 'subject') render();
+  }
   return S.subjects;
 }
 
@@ -192,10 +226,21 @@ async function loadWeek(offset, force) {
 }
 
 async function loadSchedule(force) {
-  if (S.schedule && Date.now() - S.scheduleAt < 60_000 && !force) return S.schedule;
+  if (!S.schedule) {
+    const cached = lsGetJson('lt_schedule_cache', null);
+    if (cached && Array.isArray(cached.data)) {
+      S.schedule = cached.data;
+      S.scheduleAt = cached.at || 0;
+    }
+  }
+  const fresh = Date.now() - S.scheduleAt < 15 * 60 * 1000;
+  if (S.schedule && fresh && !force) return S.schedule;
+  const had = S.schedule;
   const cid = await ensureClass();
   S.schedule = await Diary.getSchedule(cid);
   S.scheduleAt = Date.now();
+  lsSetJson('lt_schedule_cache', { at: S.scheduleAt, data: S.schedule });
+  if (had && !force && S.route.screen === 'schedule') render();
   return S.schedule;
 }
 
@@ -298,6 +343,7 @@ const ICON_PATHS = {
   homework: '<path d="M5 4h9l5 5v11H5z"/><path d="M14 4v5h5"/>',
   bell: '<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
   download: '<path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/>',
   palette: '<path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 0-4H13a2 2 0 0 1 0-4h4a4 4 0 0 0 0-8z"/><circle cx="7.5" cy="10.5" r=".8"/><circle cx="10" cy="7" r=".8"/><circle cx="14.5" cy="7" r=".8"/>',
   users: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3 3 0 0 1 0 5.6"/><path d="M17.5 20a5 5 0 0 0-2-4"/>',
@@ -356,8 +402,10 @@ function renderHeader() {
 function refreshCurrent() {
   const sc = S.route.screen;
   if (sc === 'dairy') S.diary.clear();
-  if (sc === 'marks' || sc === 'subject' || sc === 'goals' || sc === 'critical') { S.subjects = null; S.subjectsAt = 0; }
-  if (sc === 'schedule') S.schedule = null;
+  if (sc === 'marks' || sc === 'subject' || sc === 'goals' || sc === 'critical') {
+    S.subjects = null; S.subjectsAt = 0; Prefs.del('lt_marks_cache');
+  }
+  if (sc === 'schedule') { S.schedule = null; S.scheduleAt = 0; Prefs.del('lt_schedule_cache'); }
   toast('Обновляю…');
   render();
 }
@@ -448,15 +496,27 @@ function screenDairy(root) {
         const card = el('div', 'card');
         items.sort((a, b) => a.lessonNumber - b.lessonNumber);
         items.forEach((it) => {
+          const done = isHwDone(it);
           const row = el('div', 'lesson tap');
           row.innerHTML =
-            '<div class="lnum">' + it.lessonNumber + '</div>' +
-            '<div class="lbody"><div class="lsubj">' + esc(it.subjectName) + '</div>' +
+            '<div class="lavatar" style="background:' + subjColor(it.subjectId) + '">' +
+              esc(it.subjectName.trim().slice(0, 2)) + '</div>' +
+            '<div class="lbody">' +
+              '<div class="lsubj">' + esc(it.subjectName) + '<span class="ln">' + it.lessonNumber + ' урок</span></div>' +
               (it.theme ? '<div class="ltheme">' + esc(it.theme) + '</div>' : '') +
-              (it.homework ? '<div class="lhw">ДЗ · ' + esc(it.homework) + '</div>' : '') +
+              (it.homework ? '<div class="lhw">' + icon('homework', 11) + '<span>' + esc(it.homework) + '</span></div>' : '') +
+              (it.teacherFio ? '<div class="lteacher">' + esc(it.teacherFio) + '</div>' : '') +
             '</div>' +
-            (it.mark ? '<div class="mark ' + markClass(it.mark) + '">' + esc(it.mark) + '</div>' : '');
+            (it.mark ? '<div class="mark ' + markClass(it.mark) + '">' + esc(it.mark) + '</div>' : '') +
+            (it.homework ? '<button class="lcheck' + (done ? ' on' : '') + '" aria-label="' +
+              (done ? 'Домашка сделана' : 'Отметить домашку') + '">' + icon('check', 18) + '</button>' : '');
           row.onclick = () => openLessonSheet(it);
+          const check = row.querySelector('.lcheck');
+          if (check) check.onclick = (ev) => {
+            ev.stopPropagation();
+            toggleHw(it);
+            render();
+          };
           card.appendChild(row);
         });
         list.appendChild(card);
@@ -1365,10 +1425,12 @@ function showLogin() {
       Prefs.set('diary_password', pass);
       Prefs.setStudentId(res.studentId);
       Prefs.set('diary_user_id', String(res.userId));
-      try { Prefs.setUchYear(await Diary.getUchYear()); } catch (e) {}
+      if (!Prefs.uchYear()) Prefs.setUchYear(schoolYearNow());
       S.user = { fio: res.fio, uchName: '' };
-      try { const u = await Diary.getUserData(); S.user = u; } catch (e) {}
       showApp();
+      // Профиль и год уточняем в фоне, чтобы не задерживать вход.
+      Diary.getUserData().then((u) => { S.user = u; if (S.route.screen === 'settings') render(); }).catch(() => {});
+      Diary.getUchYear().then((y) => Prefs.setUchYear(y)).catch(() => {});
     } catch (e) {
       err.textContent = e.message || 'Не удалось войти';
     } finally {
@@ -1432,9 +1494,8 @@ async function boot() {
   showApp();
   hideSplash();
 
-  if (!Prefs.uchYear()) {
-    Diary.getUchYear().then((y) => Prefs.setUchYear(y)).catch(() => {});
-  }
+  if (!Prefs.uchYear()) Prefs.setUchYear(schoolYearNow());
+  Diary.getUchYear().then((y) => Prefs.setUchYear(y)).catch(() => {});
   Diary.getUserData().then((u) => {
     S.user = u;
     if (S.route.screen === 'settings') render();

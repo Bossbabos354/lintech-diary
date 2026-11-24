@@ -169,6 +169,24 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .day-label span { font-size: 12px; color: var(--text3); }
 
 .lesson { display: flex; align-items: center; gap: 12px; padding: 13px 14px; }
+.lavatar {
+  width: 44px; height: 44px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800;
+}
+.ln { margin-left: 7px; font-size: 9.5px; font-weight: 700; color: var(--text3); white-space: nowrap; }
+.lteacher { font-size: 10.5px; color: var(--text3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lhw { display: flex; gap: 5px; align-items: flex-start; }
+.lhw .icon { flex: none; margin-top: 2px; color: var(--accent); opacity: .8; }
+.lhw span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lcheck {
+  width: 38px; height: 38px; flex: none; border: 0; border-radius: 13px;
+  display: grid; place-items: center; cursor: pointer;
+  background: rgba(120, 126, 160, .12); color: var(--text3);
+  transition: background .18s ease, color .18s ease, transform .15s ease;
+}
+.lcheck .icon { stroke-width: 2.2; }
+.lcheck.on { background: rgba(90, 90, 242, .18); color: var(--accent); }
+.lcheck:active { transform: scale(.9); }
 .lesson + .lesson { border-top: 1px solid var(--separator); }
 .lnum {
   width: 30px; height: 30px; flex: none; border-radius: 10px; display: grid; place-items: center;
