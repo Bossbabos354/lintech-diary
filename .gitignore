@@ -11,9 +11,7 @@ local.properties
 # Архивы, старые копии и серверные скрипты
 *.zip
 /versions/
-/updateserver/
 /stable_debug/
-/web/
 /ios-port/
 /design/
 *.figcraft
@@ -31,3 +29,6 @@ signing.properties
 *.jks
 updateserver/config.php
 /promo/
+
+# секреты сервера
+updateserver/config.php
