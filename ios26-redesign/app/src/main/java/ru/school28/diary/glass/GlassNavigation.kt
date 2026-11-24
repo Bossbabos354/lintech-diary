@@ -62,7 +62,6 @@ fun GlassTopBar(
     onSettings: () -> Unit,
     unread: Int,
     modifier: Modifier = Modifier,
-    onHome: () -> Unit = {},
 ) {
     val colors = Glass.colors
     Row(
@@ -74,11 +73,9 @@ fun GlassTopBar(
         // В левом верхнем углу — логотип школы, а не иконка приложения.
         Image(
             painter = painterResource(R.drawable.lintex_logo),
-            contentDescription = "На главную",
+            contentDescription = null,
             contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .size(width = 35.dp, height = 40.dp)
-                .clickable { onHome() },
+            modifier = Modifier.size(width = 35.dp, height = 40.dp),
         )
         Spacer(Modifier.width(10.dp))
         Column {
