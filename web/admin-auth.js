@@ -2,8 +2,9 @@
    ЛинТех 28 — общий вход в админку.
 
    Пароль сохраняется один раз в localStorage и подставляется во все
-   инструменты (загрузка APK, статьи, расписание). Кнопка «Выйти» забывает
-   пароль на этом устройстве.
+   инструменты (расписание, события). Пароль проверяется на сервере
+   (Yandex Cloud Function), GitHub-токен в браузер не попадает.
+   Кнопка «Выйти» забывает пароль на этом устройстве.
 
    Важно: пароль хранится в браузере как есть — это удобно, но означает,
    что любой, у кого есть доступ к этому браузеру, попадёт в админку.
@@ -13,6 +14,7 @@
   'use strict';
 
   var KEY = 'lt28_admin_pass';
+  var PROXY = 'https://functions.yandexcloud.net/d4eojimh0r45jrrtadm0';
 
   var AdminAuth = {
     get: function () {
@@ -54,6 +56,21 @@
       }
 
       return saved;
+    },
+    /* Запрос к GitHub через серверную функцию: чтение и запись web/data/*.json */
+    request: function (body) {
+      var payload = Object.assign({ action: 'github' }, body);
+      payload.password = AdminAuth.get();
+      return fetch(PROXY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (r) {
+        return r.json().catch(function () { return { ok: false, error: 'HTTP ' + r.status }; });
+      }).then(function (data) {
+        if (!data.ok && /парол/i.test(String(data.error || ''))) AdminAuth.clear();
+        return data;
+      });
     },
     /* Обработка ответа сервера: если пароль неверный — забываем его,
        чтобы следующий вход снова спросил пароль. */
