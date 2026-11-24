@@ -9,28 +9,26 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/configure-pages@v5
+      - name: Собрать содержимое сайта
+        run: |
+          rm -rf /tmp/site && mkdir -p /tmp/site
+          cp -r web/. /tmp/site/
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: web
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Опубликовать ветку gh-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan gh-pages-new
+          git rm -rf . > /dev/null
+          cp -r /tmp/site/. .
+          git add -A
+          git commit -m "Pages: ${GITHUB_SHA}"
+          git push -f origin gh-pages-new:gh-pages
