@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админка — ЛинТех 28</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #0d0817; color: #ece9ff; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #8f89ad; font-size: 13px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: #b9b3d6; margin: 14px 0 6px; }
+  input, select, textarea, button { width: 100%; box-sizing: border-box; font: inherit; }
+  input, select, textarea { background: #161022; color: #ece9ff; border: 1px solid #2c2440;
+         border-radius: 12px; padding: 10px 12px; }
+  textarea { min-height: 320px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  button { margin-top: 14px; padding: 12px; border: 0; border-radius: 12px;
+           background: #6c4bd6; color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  #status { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  .ok { color: #7ee0a8; } .err { color: #ff8a8a; }
+  a { color: #b9a6ff; }
+</style>
+</head>
+<body>
+  <h1>Админка расписания и событий</h1>
+  <div class="sub">Правки сохраняются коммитом в <code>web/data/*.json</code> репозитория на GitHub.</div>
+
+  <label>GitHub-токен (fine-grained, Contents: Read and write)</label>
+  <input id="token" type="password" placeholder="github_pat_…" autocomplete="off">
+
+  <div class="row">
+    <div>
+      <label>Файл</label>
+      <select id="file">
+        <option value="schedule.json">Расписание</option>
+        <option value="events.json">События</option>
+      </select>
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button id="loadBtn" type="button">Загрузить</button>
+    </div>
+  </div>
+
+  <label>Содержимое (JSON)</label>
+  <textarea id="content" spellcheck="false"></textarea>
+
+  <button id="saveBtn" type="button">Сохранить в репозиторий</button>
+  <div id="status"></div>
+  <div class="sub" style="margin-top:18px">
+    После сохранения GitHub Pages пересобирается ~40 секунд. Приложение на Android
+    берёт данные оттуда же.
+  </div>
+
+<script>
+const OWNER = 'Bossbabos354';
+const REPO = 'lintech-diary';
+const BRANCH = 'main';
+const TOKEN_KEY = 'lintech_admin_token';
+
+const tokenEl = document.getElementById('token');
+const fileEl = document.getElementById('file');
+const contentEl = document.getElementById('content');
+const statusEl = document.getElementById('status');
+let currentSha = null;
+
+tokenEl.value = localStorage.getItem(TOKEN_KEY) || '';
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = cls || '';
+}
+
+function apiUrl() {
+  return 'https://api.github.com/repos/' + OWNER + '/' + REPO +
+    '/contents/web/data/' + encodeURIComponent(fileEl.value);
+}
+
+function authHeaders() {
+  const token = tokenEl.value.trim();
+  if (!token) throw new Error('Нужен GitHub-токен');
+  localStorage.setItem(TOKEN_KEY, token);
+  return {
+    'Authorization': 'Bearer ' + token,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
+}
+
+function fromBase64(b64) {
+  const bin = atob(b64.replace(/\s/g, ''));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+function toBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+
+async function load() {
+  try {
+    setStatus('Загружаю…');
+    const resp = await fetch(apiUrl() + '?ref=' + BRANCH, { headers: authHeaders() });
+    if (!resp.ok) throw new Error('GitHub: HTTP ' + resp.status);
+    const data = await resp.json();
+    currentSha = data.sha;
+    contentEl.value = fromBase64(data.content);
+    setStatus('Загружено: ' + fileEl.value, 'ok');
+  } catch (e) {
+    currentSha = null;
+    setStatus(e.message, 'err');
+  }
+}
+
+async function save() {
+  let parsed;
+  try {
+    parsed = JSON.parse(contentEl.value);
+  } catch (e) {
+    setStatus('Некорректный JSON: ' + e.message, 'err');
+    return;
+  }
+  try {
+    setStatus('Сохраняю…');
+    const body = {
+      message: 'Админка: обновлён ' + fileEl.value,
+      content: toBase64(JSON.stringify(parsed, null, 2) + '\n'),
+      branch: BRANCH
+    };
+    if (currentSha) body.sha = currentSha;
+    const resp = await fetch(apiUrl(), {
+      method: 'PUT',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error('GitHub: HTTP ' + resp.status + (err.message ? ' — ' + err.message : ''));
+    }
+    const data = await resp.json();
+    currentSha = data.content.sha;
+    setStatus('Сохранено коммитом ' + data.commit.sha.slice(0, 7) + '. Pages обновится через ~40 с.', 'ok');
+  } catch (e) {
+    setStatus(e.message, 'err');
+  }
+}
+
+document.getElementById('loadBtn').onclick = load;
+document.getElementById('saveBtn').onclick = save;
+fileEl.onchange = () => { currentSha = null; contentEl.value = ''; setStatus(''); };
+load();
+</script>
+</body>
+</html>
