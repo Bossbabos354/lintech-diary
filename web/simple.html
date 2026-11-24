@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ЛинТех 28 — Дневник</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f4f6ff;
+    color: #202639;
+    line-height: 1.5;
+    padding: 16px;
+    max-width: 480px; margin: 0 auto;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; margin-bottom: 12px; }
+  .logo .ic {
+    width: 36px; height: 36px; border-radius: 9px; overflow: hidden; flex-shrink: 0;
+    box-shadow: 0 3px 12px rgba(63,81,181,.25);
+  }
+  .logo .ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .release {
+    background: #e0f7fa; border: 1px solid #a0e4f0; border-radius: 12px;
+    padding: 12px 14px; font-size: 14px; font-weight: 700; color: #006064;
+    margin-bottom: 14px;
+  }
+
+  .card {
+    background: #fff; border-radius: 14px; padding: 16px;
+    box-shadow: 0 4px 18px rgba(43,58,143,.10);
+    margin-bottom: 14px;
+  }
+  .card h2 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #2b3a8f; }
+  .card p { font-size: 13.5px; color: #5b6380; }
+
+  .btn {
+    display: block; text-align: center; text-decoration: none;
+    font-size: 15px; font-weight: 700; padding: 14px; border-radius: 12px;
+    margin-bottom: 10px; color: #fff;
+  }
+  .btn.android { background: #3f51b5; }
+  .btn.android:active { background: #303f9f; }
+  .btn.ios { background: #1c1c1e; }
+  .btn.ios:active { background: #000; }
+  .btn.pc { background: #455a64; }
+  .btn.pc:active { background: #37474f; }
+
+  .ver { text-align: center; font-size: 12px; color: #8a91ab; margin-top: 6px; }
+  .dev { text-align: center; font-size: 12px; color: #8a91ab; margin-top: 16px; }
+  .dev a { color: #3f51b5; }
+</style>
+</head>
+<body>
+
+  <div class="logo">
+    <span class="ic"><img src="data:image/jpeg;base64,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" alt=""></span>
+    <span>ЛинТех 28 — Дневник</span>
+  </div>
+
+  <div class="release">🎉 Выход релизной версии 2.0.0!</div>
+
+  <div class="card">
+    <h2>Электронный дневник школы №28</h2>
+    <p>Оценки, расписание и домашние задания на телефоне. Без рекламы и лишнего.</p>
+  </div>
+
+  <a class="btn android" id="dlBtn" href="#">Скачать для Android (APK)</a>
+  <a class="btn ios" href="diary/index.html">Установить для iPhone</a>
+  <a class="btn pc" href="diary/index.html">Установить для ПК</a>
+
+  <div class="ver">Версия: <span id="dlVer">—</span></div>
+
+  <div class="dev"><a href="developers.html">Для разработчиков</a> · <a href="index.html">Полная версия сайта</a></div>
+
+<script>
+function applyVersion(d){
+  var v = (d && d.versionName) || '—';
+  var u = (d && d.apkUrl) || '#';
+  if (u.indexOf('https://') === 0) { u = 'http://' + u.substring(8); }
+  var dv = document.getElementById('dlVer'); if (dv) dv.textContent = v;
+  var db = document.getElementById('dlBtn'); if (db) db.href = u;
+}
+fetch('update.json', { cache: 'no-store' })
+  .then(function(r){ return r.json(); })
+  .then(applyVersion)
+  .catch(function(){ applyVersion(null); });
+</script>
+
+</body>
+</html>
