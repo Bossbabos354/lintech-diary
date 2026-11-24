@@ -74,7 +74,8 @@ function applyTheme() {
   }
   document.documentElement.dataset.theme = t;
   const bg = $('bg');
-  if (bg) bg.classList.toggle('zhan', t === 'zhan');
+  const photo = Prefs.get('lt_bg', 'auto') === 'photo' || (Prefs.get('lt_bg', 'auto') === 'auto' && t === 'zhan');
+  if (bg) bg.classList.toggle('zhan', photo);
   document.querySelectorAll('.segment [data-theme]').forEach((b) =>
     b.classList.toggle('on', b.dataset.theme === Prefs.get(THEME_KEY, 'system')));
 }
@@ -126,12 +127,57 @@ async function ensureClass() {
   return cid;
 }
 
+function notifOn() { return Prefs.get('lt_notif_on', '1') === '1'; }
+function loadNotifs() {
+  try { const a = JSON.parse(Prefs.get('lt_notifs', '[]')); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function saveNotifs(list) { Prefs.set('lt_notifs', JSON.stringify(list.slice(0, 120))); }
+function unreadNotifs() { return loadNotifs().filter((n) => !n.read).length; }
+
+function recordNewMarks(subjects) {
+  if (!notifOn()) return;
+  const seenRaw = Prefs.get('lt_seen_marks', '');
+  const now = [];
+  subjects.forEach((s) => s.marks.forEach((m) => {
+    if (m.mark) now.push(s.subjectId + '|' + m.lessonId);
+  }));
+  if (!seenRaw) { Prefs.set('lt_seen_marks', JSON.stringify(now.slice(-2000))); return; }
+  let seen = [];
+  try { seen = JSON.parse(seenRaw) || []; } catch (e) { seen = []; }
+  const seenSet = new Set(seen);
+  const added = [];
+  subjects.forEach((s) => s.marks.forEach((m) => {
+    if (!m.mark) return;
+    const key = s.subjectId + '|' + m.lessonId;
+    if (seenSet.has(key)) return;
+    added.push({
+      id: key + '_' + Date.now(),
+      title: s.subjectName,
+      text: 'Оценка ' + m.mark + (m.theme ? ' · ' + m.theme : ''),
+      at: Date.now(),
+      read: false,
+      subjectId: s.subjectId,
+    });
+  }));
+  if (added.length) {
+    saveNotifs(added.concat(loadNotifs()));
+    if (window.Notification && Notification.permission === 'granted') {
+      try {
+        const n = new Notification('ЛинТех 28', { body: added.map((x) => x.title + ': ' + x.text).join('\n'), icon: '../basic/favicon.png' });
+        setTimeout(() => n.close(), 6000);
+      } catch (e) {}
+    }
+  }
+  Prefs.set('lt_seen_marks', JSON.stringify(now.slice(-2000)));
+}
+
 async function loadSubjects(force) {
   const fresh = Date.now() - S.subjectsAt < 60_000;
   if (S.subjects && fresh && !force) return S.subjects;
   const cid = await ensureClass();
   S.subjects = await Diary.getMarks(cid, Prefs.studentId(), Prefs.uchYear());
   S.subjectsAt = Date.now();
+  try { recordNewMarks(S.subjects); } catch (e) {}
   return S.subjects;
 }
 
@@ -160,10 +206,15 @@ async function loadBells() {
       const r = await fetch(url, { cache: 'no-store' });
       if (!r.ok) continue;
       const j = await r.json();
-      if (j && j.bells) { S.bells = j.bells; return S.bells; }
+      if (j && j.bells) {
+        S.bells = j.bells;
+        S.classes = Array.isArray(j.classes) ? j.classes : [];
+        return S.bells;
+      }
     } catch (e) {}
   }
   S.bells = { weekday: [], saturday: [] };
+  S.classes = [];
   return S.bells;
 }
 
@@ -245,6 +296,14 @@ const ICON_PATHS = {
   left: '<path d="m14 6-6 6 6 6"/>',
   right: '<path d="m10 6 6 6-6 6"/>',
   homework: '<path d="M5 4h9l5 5v11H5z"/><path d="M14 4v5h5"/>',
+  bell: '<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>',
+  download: '<path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 0-4H13a2 2 0 0 1 0-4h4a4 4 0 0 0 0-8z"/><circle cx="7.5" cy="10.5" r=".8"/><circle cx="10" cy="7" r=".8"/><circle cx="14.5" cy="7" r=".8"/>',
+  users: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3 3 0 0 1 0 5.6"/><path d="M17.5 20a5 5 0 0 0-2-4"/>',
+  trash: '<path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".9"/>',
+  logout: '<path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h9"/>',
 };
 function icon(name, size) {
   return '<svg class="icon" viewBox="0 0 24 24" width="' + (size || 22) + '" height="' + (size || 22) +
@@ -261,6 +320,9 @@ function renderHeader() {
     goals: ['Цели', 'личные цели по предметам'],
     events: ['События', 'афиша школы'],
     settings: ['Настройки', 'аккаунт и оформление'],
+    appearance: ['Оформление', 'тема, фон и иконка'],
+    notifications: ['Уведомления', 'оценки и напоминания'],
+    export: ['Экспорт', 'оценки, дневник и расписание'],
     subject: [r.title || 'Предмет', 'все оценки по предмету'],
     week: ['Итоги недели', 'с понедельника по воскресенье'],
     day: [r.title || 'Итоги дня', ''],
@@ -269,7 +331,12 @@ function renderHeader() {
   const [title, sub] = titles[r.screen] || ['ЛинТех 28', ''];
   const actions = [];
   if (!isTab) actions.push('<button class="icon-btn" data-act="back" aria-label="Назад">' + icon('back', 20) + '</button>');
-  if (isTab) actions.push('<button class="icon-btn" data-act="search" aria-label="Поиск">' + icon('search', 20) + '</button>');
+  if (isTab) {
+    actions.push('<button class="icon-btn" data-act="refresh" aria-label="Обновить">' + icon('refresh', 20) + '</button>');
+    actions.push('<button class="icon-btn bell" data-act="notifs" aria-label="Уведомления">' + icon('bell', 20) +
+      (unreadNotifs() ? '<i class="badge">' + unreadNotifs() + '</i>' : '') + '</button>');
+    actions.push('<button class="icon-btn" data-act="search" aria-label="Поиск">' + icon('search', 20) + '</button>');
+  }
   actions.push('<button class="icon-btn" data-act="settings" aria-label="Настройки">' + icon('settings', 20) + '</button>');
   h.innerHTML =
     '<div style="flex:1;min-width:0"><h1>' + esc(title) + '</h1>' +
@@ -281,9 +348,20 @@ function renderHeader() {
       if (a === 'back') back();
       if (a === 'settings') go({ screen: 'settings', tab: r.tab || r.screen });
       if (a === 'search') openSearch();
+      if (a === 'notifs') go({ screen: 'notifications', tab: r.tab || 'dairy', back: { screen: r.screen, tab: r.tab } });
+      if (a === 'refresh') refreshCurrent();
     };
   });
 }
+function refreshCurrent() {
+  const sc = S.route.screen;
+  if (sc === 'dairy') S.diary.clear();
+  if (sc === 'marks' || sc === 'subject' || sc === 'goals' || sc === 'critical') { S.subjects = null; S.subjectsAt = 0; }
+  if (sc === 'schedule') S.schedule = null;
+  toast('Обновляю…');
+  render();
+}
+
 function setSub(text) {
   const s = $('h-sub');
   if (s) s.textContent = text;
@@ -317,6 +395,7 @@ function render() {
     dairy: screenDairy, schedule: screenSchedule, marks: screenMarks,
     goals: screenGoals, events: screenEvents, settings: screenSettings,
     subject: screenSubject, week: screenWeek, day: screenDay, critical: screenCritical,
+    appearance: screenAppearance, notifications: screenNotifs, export: screenExport,
   };
   (map[r.screen] || screenDairy)(root);
 }
@@ -577,7 +656,8 @@ function screenSubject(root) {
       const d = m.date ? new Date(m.date) : null;
       row.innerHTML =
         '<div class="lbody"><div class="lsubj">' + esc(d ? d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3) : '') + '</div>' +
-          '<div class="ltheme">' + esc(m.theme || '') + '</div></div>' +
+          '<div class="ltheme">' + esc(m.theme || '') + '</div>' +
+          (m.comment ? '<div class="lhw">За что: ' + esc(m.comment) + '</div>' : '') + '</div>' +
         '<div class="mark ' + markClass(m.mark) + '">' + esc(m.mark) + '</div>';
       card2.appendChild(row);
     });
@@ -912,34 +992,34 @@ function screenEvents(root) {
 
 // ---------------- настройки ----------------
 function screenSettings(root) {
-  const theme = Prefs.get(THEME_KEY, 'system');
+  const u = S.user;
   root.appendChild(el('div', 'section-title', 'Аккаунт'));
   const prof = el('div', 'card');
-  const u = S.user;
   prof.innerHTML = '<div class="subject-head">' +
     '<div class="avatar" style="background:linear-gradient(140deg,var(--accent),var(--accent2))">' + esc((u && u.fio || 'Л').slice(0, 1)) + '</div>' +
     '<div><div class="subject-name">' + esc(u ? u.fio : 'Ученик') + '</div>' +
     '<div class="teacher">' + esc(u && u.uchName ? u.uchName : 'ЛинТех 28') + '</div></div></div>';
   root.appendChild(prof);
 
-  root.appendChild(el('div', 'section-title', 'Оформление'));
-  const themeCard = el('div', 'card');
-  themeCard.innerHTML = '<div class="ri-title" style="margin-bottom:10px">Тема</div>' +
-    '<div class="segment">' +
-      [['system', 'Системная'], ['light', 'Светлая'], ['dark', 'Тёмная'], ['zhan', 'Книжная']]
-        .map(([k, l]) => '<button data-theme="' + k + '" class="' + (theme === k ? 'on' : '') + '">' + l + '</button>').join('') +
-    '</div><div class="muted" style="margin-top:10px">Книжная — фон с фотографией школы.</div>';
-  root.appendChild(themeCard);
-  themeCard.querySelectorAll('[data-theme]').forEach((b) => {
-    b.onclick = () => { setTheme(b.dataset.theme); screenSettingsRefresh(root); };
-  });
-  attachThemeButtons();
+  root.appendChild(el('div', 'section-title', 'Разделы'));
+  const nav = el('div', 'card');
+  const unread = unreadNotifs();
+  nav.innerHTML =
+    row('palette', 'Оформление', 'Тема, фон и иконка', '', 'appearance') +
+    row('bell', 'Уведомления', unread ? unread + ' новых' : 'оценки и напоминания', '', 'notifications') +
+    row('download', 'Экспорт', 'Оценки, дневник и расписание', '', 'export') +
+    row('users', 'Класс', 'Для расписания и звонков', Prefs.get('lt_class_name', 'не выбран'), 'class');
+  root.appendChild(nav);
+  nav.querySelector('[data-act="appearance"]').onclick = () => go({ screen: 'appearance', tab: 'settings', back: { screen: 'settings', tab: 'marks' } });
+  nav.querySelector('[data-act="notifications"]').onclick = () => go({ screen: 'notifications', tab: 'settings', back: { screen: 'settings', tab: 'marks' } });
+  nav.querySelector('[data-act="export"]').onclick = () => go({ screen: 'export', tab: 'settings', back: { screen: 'settings', tab: 'marks' } });
+  nav.querySelector('[data-act="class"]').onclick = openClassSheet;
 
   root.appendChild(el('div', 'section-title', 'Данные'));
   const dataCard = el('div', 'card');
   dataCard.innerHTML =
-    row('🧹', 'Очистить кэш', 'Загрузить данные заново', 'Очистить', 'clear') +
-    row('🔄', 'Обновить оценки и расписание', 'Сбросить сохранённые данные', '', 'refresh');
+    row('trash', 'Очистить кэш', 'Загрузить данные заново', 'Очистить', 'clear') +
+    row('refresh', 'Обновить оценки и расписание', 'Сбросить сохранённые данные', '', 'refresh');
   root.appendChild(dataCard);
   dataCard.querySelector('[data-act="clear"]').onclick = () => {
     S.diary.clear(); S.subjects = null; S.schedule = null;
@@ -953,12 +1033,9 @@ function screenSettings(root) {
   root.appendChild(el('div', 'section-title', 'О приложении'));
   const about = el('div', 'card');
   about.innerHTML =
-    row('📱', 'Версия', '3.0.4 · ios26', '', '') +
-    '<div class="row-item" data-act="releases" style="cursor:pointer"><div class="ri-ico">⬇</div>' +
-      '<div class="ri-body"><div class="ri-title">Релизы и APK</div>' +
-      '<div class="ri-sub">github.com/Bossbabos354/lintech-diary</div></div><div class="ri-value">↗</div></div>' +
-    '<div class="row-item" data-act="logout" style="cursor:pointer"><div class="ri-ico">🚪</div>' +
-      '<div class="ri-body"><div class="ri-title" style="color:var(--danger)">Выйти из аккаунта</div></div></div>';
+    row('info', 'Версия', '3.0.4 · ios26', '', '') +
+    row('download', 'Релизы и APK', 'github.com/Bossbabos354/lintech-diary', '↗', 'releases') +
+    row('logout', 'Выйти из аккаунта', '', '', 'logout');
   root.appendChild(about);
   about.querySelector('[data-act="releases"]').onclick = () =>
     window.open('https://github.com/Bossbabos354/lintech-diary/releases', '_blank');
@@ -967,9 +1044,227 @@ function screenSettings(root) {
   setSub(u ? u.fio : 'аккаунт и оформление');
 }
 
+function openClassSheet() {
+  (async () => {
+    let classes = S.classes || [];
+    if (!classes.length) {
+      try { await loadBells(); classes = S.classes || []; } catch (e) {}
+    }
+    const current = Prefs.get('lt_class_name', '');
+    openSheet(
+      '<h3>Класс</h3><div class="sheet-sub">Нужен для расписания и звонков</div>' +
+      '<div class="sheet-block"><div class="chips">' +
+        (classes.length ? classes.map((c) =>
+          '<button class="pill-btn' + (c === current ? ' accent' : '') + '" data-cls="' + esc(c) + '">' + esc(c) + '</button>').join('')
+          : '<div class="muted">Список классов недоступен</div>') +
+      '</div></div>',
+      (sheet) => {
+        sheet.querySelectorAll('[data-cls]').forEach((b) => {
+          b.onclick = () => {
+            Prefs.set('lt_class_name', b.dataset.cls);
+            closeSheet();
+            toast('Класс: ' + b.dataset.cls);
+            render();
+          };
+        });
+      }
+    );
+  })();
+}
+
+// ---------------- оформление ----------------
+function screenAppearance(root) {
+  const theme = Prefs.get(THEME_KEY, 'system');
+  const bgPref = Prefs.get('lt_bg', 'auto');
+  const iconPref = Prefs.get('lt_icon', 'new');
+
+  root.appendChild(el('div', 'section-title', 'Тема'));
+  const themeCard = el('div', 'card');
+  themeCard.innerHTML = '<div class="segment">' +
+    [['system', 'Системная'], ['light', 'Светлая'], ['dark', 'Тёмная'], ['zhan', 'Книжная']]
+      .map(([k, l]) => '<button data-theme="' + k + '" class="' + (theme === k ? 'on' : '') + '">' + l + '</button>').join('') +
+    '</div>';
+  root.appendChild(themeCard);
+  themeCard.querySelectorAll('[data-theme]').forEach((b) => {
+    b.onclick = () => { setTheme(b.dataset.theme); render(); };
+  });
+
+  root.appendChild(el('div', 'section-title', 'Фон приложения'));
+  const bgCard = el('div', 'card');
+  bgCard.innerHTML = '<div class="row2">' +
+    '<button class="bg-choice' + (bgPref !== 'photo' ? ' on' : '') + '" data-bg="gradient"><span class="bg-prev grad"></span>Градиент</button>' +
+    '<button class="bg-choice' + (bgPref === 'photo' ? ' on' : '') + '" data-bg="photo"><span class="bg-prev photo"></span>Фотография</button>' +
+    '</div>';
+  root.appendChild(bgCard);
+  bgCard.querySelectorAll('[data-bg]').forEach((b) => {
+    b.onclick = () => { Prefs.set('lt_bg', b.dataset.bg); applyTheme(); render(); };
+  });
+
+  root.appendChild(el('div', 'section-title', 'Иконка'));
+  const iconCard = el('div', 'card');
+  iconCard.innerHTML = '<div class="row2">' +
+    '<button class="bg-choice' + (iconPref === 'new' ? ' on' : '') + '" data-icon="new"><span class="app-ico new">28</span>Новая</button>' +
+    '<button class="bg-choice' + (iconPref === 'old' ? ' on' : '') + '" data-icon="old"><span class="app-ico old">ЛТ</span>Старая</button>' +
+    '</div><div class="muted" style="margin-top:10px">В браузере иконка меняет только оформление значка на этом экране.</div>';
+  root.appendChild(iconCard);
+  iconCard.querySelectorAll('[data-icon]').forEach((b) => {
+    b.onclick = () => { Prefs.set('lt_icon', b.dataset.icon); render(); };
+  });
+  setSub('тема, фон и иконка');
+}
+
+// ---------------- уведомления ----------------
+function screenNotifs(root) {
+  const on = notifOn();
+  root.appendChild(el('div', 'section-title', 'Настройки'));
+  const cfg = el('div', 'card');
+  cfg.innerHTML =
+    '<label class="row-item"><div class="ri-body"><div class="ri-title">Уведомления</div>' +
+      '<div class="ri-sub">Новые оценки и домашние задания</div></div>' +
+      '<input type="checkbox" id="nOn" ' + (on ? 'checked' : '') + ' style="width:20px;height:20px;accent-color:var(--accent)"></label>' +
+    '<div class="row-item"><div class="ri-body"><div class="ri-title">Тихие часы</div>' +
+      '<div class="ri-sub">С ' + Prefs.get('lt_quiet_from', '22') + ':00 до ' + Prefs.get('lt_quiet_to', '7') + ':00</div></div></div>' +
+    '<div class="row-item"><div class="ri-body"><div class="ri-title">Дайджест</div>' +
+      '<div class="ri-sub">Сводка оценок за день</div></div>' +
+      '<select class="field" id="nDigest" style="width:92px;padding:8px">' +
+        Array.from({ length: 24 }, (_, h) => '<option value="' + h + '"' + (Number(Prefs.get('lt_digest', '19')) === h ? ' selected' : '') + '>' + (h < 10 ? '0' + h : h) + ':00</option>').join('') +
+      '</select></div>';
+  root.appendChild(cfg);
+  $('nOn').onchange = (e) => {
+    Prefs.set('lt_notif_on', e.target.checked ? '1' : '0');
+    if (e.target.checked && window.Notification && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    toast(e.target.checked ? 'Уведомления включены' : 'Уведомления выключены');
+  };
+  $('nDigest').onchange = (e) => Prefs.set('lt_digest', e.target.value);
+
+  root.appendChild(el('div', 'section-title', 'Новые оценки'));
+  const list = el('div', 'card');
+  const items = loadNotifs();
+  if (!items.length) {
+    list.innerHTML = '<div class="empty" style="padding:26px 10px">Пока пусто</div>';
+  } else {
+    items.forEach((n) => {
+      const rowEl = el('div', 'lesson tap');
+      const time = new Date(n.at);
+      rowEl.innerHTML = '<div class="lnum">' + icon('marks', 16) + '</div>' +
+        '<div class="lbody"><div class="lsubj">' + esc(n.title) + '</div>' +
+        '<div class="ltheme">' + esc(n.text) + '</div>' +
+        '<div class="lhw">' + time.getDate() + ' ' + MONTHS[time.getMonth()].slice(0, 3) + ', ' +
+          String(time.getHours()).padStart(2, '0') + ':' + String(time.getMinutes()).padStart(2, '0') + '</div></div>' +
+        (n.read ? '' : '<span class="badge dot"></span>');
+      rowEl.onclick = () => {
+        saveNotifs(loadNotifs().map((x) => x.id === n.id ? { ...x, read: true } : x));
+        if (n.subjectId) go({ screen: 'subject', id: n.subjectId, tab: 'marks', back: { screen: 'notifications', tab: 'marks' } });
+        else render();
+      };
+      list.appendChild(rowEl);
+    });
+  }
+  root.appendChild(list);
+  const clear = el('button', 'btn danger', 'Очистить список');
+  clear.style.marginTop = '8px';
+  clear.onclick = () => { saveNotifs([]); render(); toast('Список очищен'); };
+  root.appendChild(clear);
+
+  if (on && window.Notification && Notification.permission === 'denied') {
+    root.appendChild(el('div', 'muted', 'Браузер запретил уведомления в настройках сайта.'));
+  }
+  setSub(unreadNotifs() ? unreadNotifs() + ' новых' : 'оценки и напоминания');
+}
+
+// ---------------- экспорт ----------------
+function download(name, text, mime) {
+  const blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function dd(d) {
+  const x = new Date(d);
+  const p = (n) => String(n).padStart(2, '0');
+  return p(x.getDate()) + '.' + p(x.getMonth() + 1) + '.' + x.getFullYear();
+}
+
+function screenExport(root) {
+  root.appendChild(el('div', 'section-title', 'Файлы'));
+  const card = el('div', 'card');
+  card.innerHTML =
+    row('marks', 'Оценки', 'CSV: предмет, дата, оценка, вес', '', 'csvMarks') +
+    row('dairy', 'Дневник недели', 'CSV: уроки, темы и домашние задания', '', 'csvDiary') +
+    row('schedule', 'Расписание', 'ICS для календаря', '', 'ics') +
+    row('download', 'Резервная копия целей', 'JSON', '', 'goals');
+  root.appendChild(card);
+
+  card.querySelector('[data-act="csvMarks"]').onclick = async () => {
+    try {
+      const subjects = await loadSubjects(false);
+      const rows = [['Предмет', 'Дата', 'Оценка', 'Вес', 'Тема'].map(csvCell).join(';')];
+      subjects.forEach((s) => s.marks.filter((m) => m.mark).forEach((m) => {
+        rows.push([s.subjectName, dd(m.date), m.mark, m.weight == null ? 1 : m.weight, m.theme || ''].map(csvCell).join(';'));
+      }));
+      download('lintech-marks.csv', '\ufeff' + rows.join('\r\n'), 'text/csv;charset=utf-8');
+      toast('Файл с оценками скачан');
+    } catch (e) { toast('Ошибка: ' + e.message); }
+  };
+
+  card.querySelector('[data-act="csvDiary"]').onclick = async () => {
+    try {
+      const entries = await loadWeek(S.weekOffset || 0);
+      const rows = [['Дата', 'Урок', 'Предмет', 'Тема', 'Домашнее задание', 'Оценка'].map(csvCell).join(';')];
+      entries.forEach((e) => rows.push([dd(e.date), e.lessonNumber, e.subjectName, e.theme || '', e.homework || '', e.mark || ''].map(csvCell).join(';')));
+      download('lintech-diary.csv', '\ufeff' + rows.join('\r\n'), 'text/csv;charset=utf-8');
+      toast('Дневник скачан');
+    } catch (e) { toast('Ошибка: ' + e.message); }
+  };
+
+  card.querySelector('[data-act="ics"]').onclick = async () => {
+    try {
+      const schedule = await loadSchedule(false);
+      const bells = await loadBells();
+      const { monday } = Diary.weekRange(0);
+      const pad = (n) => String(n).padStart(2, '0');
+      const stamp = (d) => d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//LinTech 28//RU'];
+      schedule.forEach((x) => {
+        if (x.weekday < 1 || x.weekday > 6) return;
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + (x.weekday - 1));
+        const table = (x.weekday === 6 ? bells.saturday : bells.weekday) || [];
+        const bell = table.find((b) => Number(b.n) === x.lessonOrder);
+        const start = bell ? bell.start : '08:30';
+        const end = bell ? bell.end : '09:15';
+        lines.push('BEGIN:VEVENT', 'UID:' + x.subjectId + '-' + stamp(d) + '-' + x.lessonOrder + '@lintech28',
+          'DTSTAMP:' + stamp(d) + 'T000000', 'DTSTART;TZID=Europe/Kirov:' + stamp(d) + 'T' + start.replace(':', '') + '00',
+          'DTEND;TZID=Europe/Kirov:' + stamp(d) + 'T' + end.replace(':', '') + '00',
+          'SUMMARY:' + (x.subjectName || 'Урок') + (x.room ? ' (каб. ' + x.room + ')' : ''),
+          'END:VEVENT');
+      });
+      lines.push('END:VCALENDAR');
+      download('lintech-schedule.ics', lines.join('\r\n'), 'text/calendar;charset=utf-8');
+      toast('Календарь скачан');
+    } catch (e) { toast('Ошибка: ' + e.message); }
+  };
+
+  card.querySelector('[data-act="goals"]').onclick = () => {
+    download('lintech-goals.json', JSON.stringify(loadGoals(), null, 2), 'application/json');
+    toast('Цели сохранены в файл');
+  };
+  setSub('оценки, дневник и расписание');
+}
+
 function row(ico, title, sub, value, act) {
+  const icoHtml = ICON_PATHS[ico] ? icon(ico, 19) : esc(ico);
   return '<div class="row-item"' + (act ? ' data-act="' + act + '"' : '') + '>' +
-    '<div class="ri-ico">' + ico + '</div>' +
+    '<div class="ri-ico">' + icoHtml + '</div>' +
     '<div class="ri-body"><div class="ri-title">' + esc(title) + '</div>' +
       (sub ? '<div class="ri-sub">' + esc(sub) + '</div>' : '') + '</div>' +
     (value ? '<div class="ri-value">' + esc(value) + '</div>' : '') + '</div>';
@@ -1113,6 +1408,19 @@ async function boot() {
       setTimeout(() => splash.remove(), 420);
     }, left);
   };
+
+  const line = $('splashLine');
+  if (line) {
+    const lines = ['Дневник', 'Оценки', 'Расписание', 'Цели', 'События'];
+    let i = 0;
+    setInterval(() => {
+      if (!document.getElementById('splashLine')) return;
+      line.textContent = lines[i++ % lines.length];
+      line.classList.remove('in');
+      void line.offsetWidth;
+      line.classList.add('in');
+    }, 240);
+  }
 
   const login = Prefs.login();
   const pass = Prefs.password();

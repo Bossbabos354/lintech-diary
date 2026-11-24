@@ -372,6 +372,7 @@ const Diary = (() => {
             date,
             subjectName: subjName, theme: l[4] || null, homework: l[8] || null,
             mark: markRec ? (markRec[2] || '') : '',
+            comment: markRec ? (markRec[8] || '') : '',
             // Журнал берёт вес из [9] (может быть дробным), [3] — запасной вариант.
             weight: numOrNull(l[9]) !== null ? numOrNull(l[9]) : numOrNull(l[3]),
           };
