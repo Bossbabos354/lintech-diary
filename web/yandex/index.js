@@ -2,6 +2,10 @@
 // Тот же контракт, что web/proxy.php: { e, p, cookie, get } -> { ok, code, text }.
 
 const BASE = 'https://journal.school28-kirov.ru';
+const GH_REPO = process.env.GITHUB_REPO || 'Bossbabos354/lintech-diary';
+const GH_TOKEN = process.env.GITHUB_TOKEN || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const DATA_PATH = /^web\/data\/[a-z0-9-]+\.json$/;
 
 function json(obj, status, cors) {
   return {
@@ -21,6 +25,50 @@ function corsHeaders(headers) {
   };
 }
 
+async function github(body) {
+  if (!ADMIN_PASSWORD || String(body.password || '') !== ADMIN_PASSWORD) {
+    return { status: 403, data: { ok: false, error: 'Неверный пароль' } };
+  }
+  if (!GH_TOKEN) return { status: 500, data: { ok: false, error: 'Токен не настроен' } };
+
+  const path = String(body.path || '');
+  if (!DATA_PATH.test(path)) return { status: 400, data: { ok: false, error: 'Недопустимый файл' } };
+
+  const url = 'https://api.github.com/repos/' + GH_REPO + '/contents/' + path;
+  const headers = {
+    Authorization: 'Bearer ' + GH_TOKEN,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'lintech-admin',
+  };
+
+  if (body.op === 'read') {
+    const resp = await fetch(url + '?ref=main', { headers });
+    const data = await resp.json();
+    if (!resp.ok) return { status: resp.status, data: { ok: false, error: data.message || 'GitHub error' } };
+    return { status: 200, data: { ok: true, sha: data.sha, content: Buffer.from(data.content || '', 'base64').toString('utf8') } };
+  }
+
+  if (body.op === 'write') {
+    const payload = {
+      message: String(body.message || 'Админка: обновление данных'),
+      content: Buffer.from(String(body.content || ''), 'utf8').toString('base64'),
+      branch: 'main',
+    };
+    if (body.sha) payload.sha = body.sha;
+    const resp = await fetch(url, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) return { status: resp.status, data: { ok: false, error: data.message || 'GitHub error' } };
+    return { status: 200, data: { ok: true, sha: data.content.sha, commit: data.commit.sha } };
+  }
+
+  return { status: 400, data: { ok: false, error: 'Неизвестная операция' } };
+}
+
 exports.handler = async (event) => {
   const cors = corsHeaders(event.headers || {});
   const method = event.httpMethod || 'POST';
@@ -36,6 +84,11 @@ exports.handler = async (event) => {
     body = JSON.parse(raw);
   } catch (e) {
     body = {};
+  }
+
+  if (body.action === 'github') {
+    const r = await github(body);
+    return json(r.data, r.status, cors);
   }
 
   const endpoint = String(body.e || '').trim();
