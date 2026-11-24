@@ -362,11 +362,17 @@ function renderMarks() {
         Prefs.setClassId(cid);
       }
       const subjects = await Diary.getMarks(cid, sid, Prefs.uchYear());
-      const allNumeric = subjects.flatMap(s => s.marks).map(m => parseInt(m.mark, 10)).filter(n => !isNaN(n));
-      const avg = allNumeric.length ? allNumeric.reduce((a, b) => a + b, 0) / allNumeric.length : null;
+      // Средний балл — средневзвешенный за текущий период, как в журнале и в приложении.
+      const subjectAvgs = subjects
+        .map(s => Diary.currentPeriodAverage(s))
+        .filter(v => v != null);
+      const avg = subjectAvgs.length
+        ? subjectAvgs.reduce((a, b) => a + b, 0) / subjectAvgs.length
+        : null;
 
       cont.innerHTML = '';
       cont.appendChild(renderOverall(avg));
+      cont.appendChild(renderCritical(subjects));
 
       subjects.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ru'));
       if (!subjects.length) {
@@ -379,6 +385,30 @@ function renderMarks() {
     }
   }
   load();
+  return wrap;
+}
+
+function renderCritical(subjects) {
+  const weak = subjects
+    .map(s => ({ s, avg: Diary.currentPeriodAverage(s) }))
+    .filter(x => x.avg != null && x.avg < 3.5)
+    .sort((a, b) => a.avg - b.avg);
+  const wrap = el('div', 'critical-block');
+  if (!weak.length) {
+    wrap.innerHTML = '<div class="critical-title">Всё под контролем</div>' +
+      '<div class="critical-sub">Нет предметов со средним ниже 3,5</div>';
+    return wrap;
+  }
+  wrap.innerHTML = '<div class="critical-title">Требуют внимания</div>';
+  const list = el('div', 'critical-list');
+  weak.forEach(({ s, avg }) => {
+    const chip = el('div', 'critical-chip');
+    chip.innerHTML = '<span>' + escapeHtml(s.subjectName) + '</span><b>' +
+      avg.toFixed(2).replace('.', ',') + '</b>';
+    chip.onclick = () => openGoalSheet(s, 'YEAR');
+    list.appendChild(chip);
+  });
+  wrap.appendChild(list);
   return wrap;
 }
 
@@ -420,10 +450,14 @@ function renderSubject(s) {
     card.innerHTML += `<div class="totals">${totalsArr.map(([p, m]) => `${labelOf(p)}: ${escapeHtml(m)}`).join(' · ')}</div>`;
   }
 
-  const numeric = s.marks.map(m => parseInt(m.mark, 10)).filter(n => !isNaN(n));
-  if (numeric.length) {
-    const avg = (numeric.reduce((a, b) => a + b, 0) / numeric.length).toFixed(2).replace('.', ',');
-    card.innerHTML += `<div class="subj-avg">Средний: <b>${avg}</b></div>`;
+  const periodAvg = Diary.currentPeriodAverage(s);
+  if (periodAvg != null) {
+    const txt = periodAvg.toFixed(2).replace('.', ',');
+    const rounded = Diary.roundedMark(periodAvg);
+    const color = periodAvg >= 4.5 ? 'var(--success)' : periodAvg >= 3.5 ? '#FFB74D' : 'var(--error)';
+    card.innerHTML += `<div class="subj-avg">Средний за период: ` +
+      `<b style="color:${color}">${txt}</b>` +
+      `<span class="subj-round" style="background:${hexToAlpha(bgHex(color === 'var(--success)' ? '#66BB6A' : color === 'var(--error)' ? '#EF5350' : '#FFB74D'))};color:${color}">≈ ${rounded}</span></div>`;
   }
 
   // Подсказка по цели / «Узнать больше» — как в приложении
