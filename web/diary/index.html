@@ -455,12 +455,11 @@ function renderSubject(s) {
 
   const periodAvg = Diary.currentPeriodAverage(s);
   if (periodAvg != null) {
+    // Точный средний балл до сотых — без округления до оценки.
     const txt = periodAvg.toFixed(2).replace('.', ',');
-    const rounded = Diary.roundedMark(periodAvg);
     const color = periodAvg >= 4.5 ? 'var(--success)' : periodAvg >= 3.5 ? '#FFB74D' : 'var(--error)';
     card.innerHTML += `<div class="subj-avg">Средний за период: ` +
-      `<b style="color:${color}">${txt}</b>` +
-      `<span class="subj-round" style="background:${hexToAlpha(bgHex(color === 'var(--success)' ? '#66BB6A' : color === 'var(--error)' ? '#EF5350' : '#FFB74D'))};color:${color}">≈ ${rounded}</span></div>`;
+      `<b style="color:${color}">${txt}</b></div>`;
   }
 
   // Подсказка по цели / «Узнать больше» — как в приложении
@@ -964,7 +963,6 @@ function openGoalSheet(subject, initialPeriodKey) {
   function paint() {
     const marks = Diary.marksForPeriod(subject, gs.periodKey);
     const avg = Diary.weightedAverage(marks);
-    const rounded = Diary.roundedMark(avg);
     const allowedArr = Array.from(gs.allowed);
     const needed = Diary.needed(marks, gs.targetMark, allowedArr);
     const avgText = avg == null ? '—' : avg.toFixed(2).replace('.', ',');
@@ -996,7 +994,7 @@ function openGoalSheet(subject, initialPeriodKey) {
         '<button class="gs-close" id="goalClose" aria-label="Закрыть">✕</button>' +
       '</div>' +
       '<div class="gs-block"><div class="bl">Текущие оценки</div><div class="gs-chips">' + marksChips + '</div>' +
-        (marks.length ? '<div class="gs-avg">Средний: ' + avgText + (rounded ? ' · тянет на «' + rounded + '»' : '') + '</div>' : '') +
+        (marks.length ? '<div class="gs-avg">Средний: ' + avgText + '</div>' : '') +
       '</div>' +
       '<div class="gs-block"><div class="bl">За какой период</div>' +
         '<select class="gs-select" id="goalPeriod">' + periodOpts + '</select>' +
