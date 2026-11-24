@@ -1,6 +1,6 @@
 {
-  "versionCode": 104,
-  "versionName": "3.0.3",
-  "apkUrl": "https://github.com/Bossbabos354/lintech-diary/releases/latest/download/SchoolDiary_3.0.3.apk",
-  "notes": "Старт сразу с дневника, экран «Оформление», расписание и события"
+  "versionCode": 105,
+  "versionName": "3.0.4",
+  "apkUrl": "https://github.com/Bossbabos354/lintech-diary/releases/latest/download/SchoolDiary_3.0.4.apk",
+  "notes": "Веб-версия по интерфейсу приложения, точные средние баллы, расписание и события с GitHub Pages"
 }
