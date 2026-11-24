@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Статьи и события | Админка ЛинТех 28</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+<div class="admin-shell">
+
+  <header class="admin-bar">
+    <a class="bar-brand" href="tools.html">ЛинТех&nbsp;28</a>
+    <span class="bar-title">Статьи и события</span>
+    <div class="bar-right">
+      <a class="bar-btn" href="tools.html">Все инструменты</a>
+      <button class="bar-btn" id="logoutBtn" type="button">Выйти</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+
+    <div class="admin-head">
+      <div>
+        <h1>Статьи и события</h1>
+        <p class="sub">Лента для вкладки «События» в приложении. Данные сохраняются в <code>events.json</code>.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn secondary" type="button" onclick="toList(true)">Список</button>
+        <button class="btn primary" type="button" onclick="newArticle()">＋ Новое событие</button>
+      </div>
+    </div>
+
+    <div class="msg" id="msg"></div>
+
+    <!-- Вход (только если пароль ещё не сохранён) -->
+    <div class="panel auth-panel" id="authCard" style="display:none">
+      <h2>Вход</h2>
+      <label for="pw">Пароль администратора</label>
+      <input type="password" id="pw" placeholder="Пароль для редактирования" autocomplete="current-password">
+      <div class="hint">Один пароль на все инструменты: загрузку версий, статьи и расписание.</div>
+      <div class="btns">
+        <button class="btn primary" type="button" onclick="login()">Войти</button>
+      </div>
+    </div>
+
+    <!-- Список статей -->
+    <div class="panel" id="listCard" style="display:none">
+      <h2>Опубликовано</h2>
+      <div id="listItems"></div>
+      <div class="btns">
+        <button class="btn secondary" type="button" onclick="newArticle()">＋ Создать новое событие</button>
+      </div>
+    </div>
+
+    <!-- Редактор -->
+    <div class="panel required" id="editCard" style="display:none">
+      <h2 id="editTitle">Новое событие</h2>
+
+      <label for="f_date">Дата</label>
+      <div class="admin-dayrow">
+        <div><input type="date" id="f_date"></div>
+        <div><input type="time" id="f_time" title="Время события"></div>
+      </div>
+      <div class="hint">Время можно не указывать, если событие на весь день.</div>
+
+      <label for="f_title">Заголовок *</label>
+      <input type="text" id="f_title" placeholder="Например: Школьная олимпиада">
+
+      <label for="f_text">Краткое описание (для списка в приложении)</label>
+      <textarea id="f_text" placeholder="Коротко, что это за событие"></textarea>
+
+      <label for="f_content">Полный текст (для страницы события)</label>
+      <textarea id="f_content" placeholder="Подробное описание (можно HTML: &lt;p&gt;, &lt;b&gt;, &lt;ul&gt;…)"></textarea>
+
+      <label for="f_imgfile">Картинка</label>
+      <input type="file" id="f_imgfile" accept="image/*">
+      <img class="hint" id="f_imgprev" alt="" style="display:none; max-height:180px; margin-top:10px; border:1px solid var(--line);">
+      <input type="text" id="f_image" placeholder="или URL картинки" style="margin-top:8px">
+      <div class="hint">Загрузите картинку с устройства или укажите готовый URL.</div>
+
+      <div class="btns">
+        <button class="btn primary" type="button" onclick="saveArticle()">Сохранить</button>
+        <button class="btn secondary" type="button" onclick="toList(true)">Отмена</button>
+      </div>
+    </div>
+
+    <p class="hint">Данные сохраняются в events.json, который читает приложение.</p>
+  </main>
+
+  <footer class="admin-foot">
+    <span class="hud">© <span id="year">2026</span> ЛинТех 28 · Школа №28, Киров</span>
+    <span class="hud"><a href="index.html">На главную</a></span>
+  </footer>
+</div>
+
+<script src="admin-auth.js"></script>
+<script>
+/* ====== Данные и утилиты ====== */
+var API = 'articles.php';
+var token = '';
+var currentId = null;
+
+function $(id) { return document.getElementById(id); }
+
+function setMsg(text, ok) {
+  var el = $('msg');
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+  el.textContent = text;
+}
+function clearMsg() {
+  var el = $('msg');
+  el.className = 'msg';
+  el.textContent = '';
+}
+
+function api(body, cb) {
+  fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function (r) {
+      return r.text().then(function (t) {
+        var parsed = null;
+        try { parsed = JSON.parse(t); } catch (e) {
+          var short = t.length > 300 ? t.substring(0, 300) + '…' : t;
+          setMsg('Сервер вернул не-JSON. Скорее всего ошибка PHP:\n' + short, false);
+          cb({ ok: false, message: 'Ошибка сервера' });
+          return;
+        }
+        cb(AdminAuth.checkResponse(parsed));
+      });
+    })
+    .catch(function (err) {
+      setMsg('Ошибка сети: ' + (err && err.message ? err.message : ''), false);
+      cb({ ok: false, message: 'Ошибка сети' });
+    });
+}
+
+/* ====== Вход ====== */
+function enterApp() {
+  clearMsg();
+  $('authCard').style.display = 'none';
+  $('listCard').style.display = 'block';
+  $('editCard').style.display = 'none';
+  loadList();
+}
+
+function login() {
+  var pw = $('pw').value.trim();
+  if (!pw) { setMsg('Введите пароль', false); return; }
+  token = pw;
+  AdminAuth.set(pw);
+  enterApp();
+}
+
+token = AdminAuth.init({ input: 'pw', logout: 'logoutBtn' });
+if (token) {
+  enterApp();
+} else {
+  $('authCard').style.display = 'block';
+}
+
+/* ====== Список ====== */
+function toList(silent) {
+  if (silent) clearMsg();
+  $('editCard').style.display = 'none';
+  $('listCard').style.display = 'block';
+  loadList();
+}
+
+function loadList() {
+  api({ action: 'list' }, function (d) {
+    var box = $('listItems');
+    box.innerHTML = '';
+    var evs = d && d.events ? d.events : [];
+    if (evs.length === 0) {
+      box.innerHTML = '<p class="hint" style="margin:6px 0 0">Пока нет событий. Создайте первое.</p>';
+      return;
+    }
+    evs.forEach(function (ev) {
+      var row = document.createElement('div');
+      row.className = 'bitem';
+
+      var imgHtml = ev.image
+        ? '<img class="img" src="' + ev.image + '" alt="">'
+        : '<div class="img"></div>';
+
+      row.innerHTML =
+        imgHtml +
+        '<div class="info">' +
+          '<div class="t">' + (ev.title || 'Без названия') + '</div>' +
+          '<div class="d">' + (ev.date || '') +
+            (ev.text ? ' · ' + (ev.text.length > 40 ? ev.text.substring(0, 40) + '…' : ev.text) : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="acts">' +
+          (ev.link ? '<button class="mini" type="button" onclick="openArticle(\'' + ev.slug + '\')">Открыть</button>' : '') +
+          '<button class="mini" type="button" onclick="editArticle(\'' + ev.id + '\')">Правка</button>' +
+          '<button class="mini danger" type="button" onclick="delArticle(\'' + ev.id + '\')">✕</button>' +
+        '</div>';
+
+      box.appendChild(row);
+    });
+  });
+}
+
+/* ====== Редактор ====== */
+function newArticle() {
+  clearMsg();
+  currentId = null;
+  $('editTitle').textContent = 'Новое событие';
+  $('f_date').value = '';
+  $('f_time').value = '';
+  $('f_title').value = '';
+  $('f_text').value = '';
+  $('f_content').value = '';
+  $('f_image').value = '';
+  $('f_imgprev').style.display = 'none';
+  $('f_imgprev').removeAttribute('src');
+  $('f_imgfile').value = '';
+  $('listCard').style.display = 'none';
+  $('editCard').style.display = 'block';
+}
+
+function editArticle(id) {
+  clearMsg();
+  api({ action: 'list' }, function (d) {
+    var ev = (d.events || []).filter(function (x) { return x.id === id; })[0];
+    if (!ev) { setMsg('Не найдено', false); return; }
+    currentId = ev.id;
+    $('editTitle').textContent = 'Правка: ' + (ev.title || '');
+    $('f_date').value = ev.date || '';
+    $('f_time').value = ev.time || '';
+    $('f_title').value = ev.title || '';
+    $('f_text').value = ev.text || '';
+    $('f_content').value = ev.content || '';
+    $('f_image').value = ev.image || '';
+    if (ev.image) { $('f_imgprev').src = ev.image; $('f_imgprev').style.display = 'block'; }
+    else { $('f_imgprev').style.display = 'none'; }
+    $('f_imgfile').value = '';
+    $('listCard').style.display = 'none';
+    $('editCard').style.display = 'block';
+  });
+}
+
+function openArticle(slug) {
+  window.open('article.php?slug=' + encodeURIComponent(slug), '_blank');
+}
+
+function delArticle(id) {
+  if (!confirm('Удалить это событие?')) return;
+  api({ action: 'delete', id: id, password: token }, function (d) {
+    setMsg(d.message, d.ok);
+    if (d.ok) loadList();
+    if (!d.ok && !AdminAuth.get()) $('authCard').style.display = 'block';
+  });
+}
+
+/* Картинка: файл или URL */
+function getImage(cb) {
+  var file = $('f_imgfile').files && $('f_imgfile').files[0];
+  var url = $('f_image').value.trim();
+  if (file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var base64 = reader.result.split(',')[1];
+      setMsg('Загружаю картинку…', true);
+      api({ action: 'upload_image', file_data: base64, name: file.name, password: token }, function (d) {
+        if (d.ok) { cb(d.url); setMsg('Картинка загружена', true); }
+        else { setMsg(d.message || 'Ошибка картинки', false); cb(null); }
+      });
+    };
+    reader.readAsDataURL(file);
+  } else if (url) {
+    cb(url);
+  } else {
+    cb('');
+  }
+}
+
+function saveArticle() {
+  var title = $('f_title').value.trim();
+  if (!title) { setMsg('Заголовок обязателен', false); return; }
+
+  var date = $('f_date').value || new Date().toISOString().slice(0, 10);
+  var time = $('f_time').value || '';
+  var text = $('f_text').value.trim();
+  var content = $('f_content').value.trim();
+
+  getImage(function (imgUrl) {
+    var body = {
+      action: 'save', password: token, id: currentId || null,
+      date: date, time: time, title: title, text: text, content: content, image: imgUrl || ''
+    };
+    api(body, function (d) {
+      setMsg(d.message, d.ok);
+      if (d.ok) { currentId = d.id; toList(true); }
+      if (!d.ok && !AdminAuth.get()) $('authCard').style.display = 'block';
+    });
+  });
+}
+
+/* Превью выбранного файла */
+$('f_imgfile').addEventListener('change', function () {
+  var file = this.files && this.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    $('f_imgprev').src = reader.result;
+    $('f_imgprev').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+var year = document.getElementById('year');
+if (year) year.textContent = new Date().getFullYear();
+</script>
+</body>
+</html>

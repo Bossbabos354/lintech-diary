@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админка — инструменты | ЛинТех 28</title>
+<meta name="description" content="Все инструменты администратора сайта ЛинТех 28: статьи и события, расписание и звонки, обновление приложения, данные API.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital,wght@1,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<style>
+  .admin-main { min-height: calc(100svh - var(--nav-h)); }
+  .admin-lead { color: var(--muted); max-width: 34rem; margin-top: 12px; }
+  .tool-grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 28px; }
+  @media (min-width: 720px) { .tool-grid { grid-template-columns: 1fr 1fr; } }
+  .tool-card {
+    display: flex; flex-direction: column; gap: 10px;
+    background: var(--bg); padding: 24px; color: var(--ink);
+    transition: background-color .15s linear;
+  }
+  .tool-card:hover { background: var(--bg-raised); }
+  .tool-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .tool-num { font-family: var(--font-mono); font-size: 11px; letter-spacing: .16em; color: var(--faint); }
+  .tool-tag {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent-ink); border: 1px solid var(--line); padding: 3px 8px;
+  }
+  .tool-card h3 { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; }
+  .tool-card p { color: var(--muted); font-size: 14px; }
+  .tool-go {
+    margin-top: auto; padding-top: 6px; font-family: var(--font-mono); font-size: 11px;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink);
+  }
+  .tool-card:hover .tool-go { color: var(--ink); }
+  .admin-note {
+    margin-top: 26px; border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    padding: 16px 18px; color: var(--muted); font-size: 14px; background: var(--bg-raised);
+  }
+  .admin-note b { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<a class="skip" href="#tools">К содержанию</a>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="index.html">
+      <img src="data:image/jpeg;base64,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" alt="Логотип ЛинТех 28">
+      <b>ЛинТех&nbsp;28</b>
+    </a>
+    <nav class="nav-links">
+      <a href="index.html">Главная</a>
+      <a href="index.html#features">Возможности</a>
+      <a href="index.html#download">Установка</a>
+      <a href="developers.html">Разработчикам</a>
+      <a href="tools.html" aria-current="page">Админка</a>
+    </nav>
+    <div class="nav-right">
+      <button class="nav-cell" id="themeBtn" aria-label="Переключить тему" title="Сменить тему">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+      <a class="nav-cta" href="index.html">На сайт</a>
+    </div>
+  </div>
+</header>
+
+<main class="admin-main">
+  <section id="tools">
+    <div class="frame">
+      <span class="tick tl"></span><span class="tick tr"></span>
+      <div class="pad">
+        <div class="sec-head">
+          <span class="eyebrow hud"><span class="num">00</span> / Управление</span>
+          <h1>Инструменты админа</h1>
+          <p class="admin-lead">Всё, что нужно для ведения сайта и приложения — в одном месте. Каждый раздел открывается в новом окне и требует пароль администратора.</p>
+        </div>
+
+        <div class="tool-grid">
+          <a class="tool-card" href="articles-admin.html" target="_blank" rel="noopener">
+            <div class="tool-top"><span class="tool-num">01 / КОНТЕНТ</span><span class="tool-tag">Статьи</span></div>
+            <h3>Статьи и события</h3>
+            <p>Новости и события для вкладки «События»: заголовок, дата и время, текст, ссылка и картинка. Пишется в events.json.</p>
+            <span class="tool-go">Открыть редактор →</span>
+          </a>
+
+          <a class="tool-card" href="schedule-admin.html" target="_blank" rel="noopener">
+            <div class="tool-top"><span class="tool-num">02 / РАСПИСАНИЕ</span><span class="tool-tag">Уроки</span></div>
+            <h3>Расписание и звонки</h3>
+            <p>Звонки на понедельник–пятницу и субботу, уроки по классам с кабинетом и учителем. Пишется в schedule.json.</p>
+            <span class="tool-go">Открыть редактор →</span>
+          </a>
+
+          <a class="tool-card" href="admin.html" target="_blank" rel="noopener">
+            <div class="tool-top"><span class="tool-num">03 / ПРИЛОЖЕНИЕ</span><span class="tool-tag">Обновление</span></div>
+            <h3>Загрузка новой версии</h3>
+            <p>Выгрузить свежий APK на сервер и обновить update.json, чтобы приложение предложило обновление ученикам.</p>
+            <span class="tool-go">Открыть загрузку →</span>
+          </a>
+
+          <a class="tool-card" href="index.html" target="_blank" rel="noopener">
+            <div class="tool-top"><span class="tool-num">04 / САЙТ</span><span class="tool-tag">Главная</span></div>
+            <h3>Проверить главную</h3>
+            <p>Посмотреть, как выглядит сайт после правок: обложка, возможности, обзор, установка и подвал.</p>
+            <span class="tool-go">Открыть сайт →</span>
+          </a>
+
+          <a class="tool-card" href="events.json" target="_blank" rel="noopener">
+            <div class="tool-top"><span class="tool-num">05 / ДАННЫЕ</span><span class="tool-tag">JSON</span></div>
+            <h3>events.json</h3>
+            <p>Что сейчас лежит в ленте событий: даты, заголовки, тексты и ссылки, которые видят ученики.</p>
+            <span class="tool-go">Посмотреть данные →</span>
+          </a>
+
+          <a class="tool-card" href="schedule.json" target="_blank" rel="noopener">
+            <div class="tool-top"><span class="tool-num">06 / ДАННЫЕ</span><span class="tool-tag">JSON</span></div>
+            <h3>schedule.json</h3>
+            <p>Сырое расписание: звонки, классы и уроки. Удобно проверить, что редактор сохранил именно то, что нужно.</p>
+            <span class="tool-go">Посмотреть данные →</span>
+          </a>
+
+          <a class="tool-card" href="update.json" target="_blank" rel="noopener">
+            <div class="tool-top"><span class="tool-num">07 / ДАННЫЕ</span><span class="tool-tag">JSON</span></div>
+            <h3>update.json</h3>
+            <p>Текущая версия приложения: versionCode, versionName, ссылка на APK и текст обновления.</p>
+            <span class="tool-go">Посмотреть данные →</span>
+          </a>
+
+          <a class="tool-card" href="developers.html" target="_blank" rel="noopener">
+            <div class="tool-top"><span class="tool-num">08 / СПРАВКА</span><span class="tool-tag">Разработка</span></div>
+            <h3>Разработчикам</h3>
+            <p>Как устроены приложение и сайт, какие API используются и что нужно для сборки новой версии.</p>
+            <span class="tool-go">Открыть справку →</span>
+          </a>
+        </div>
+
+        <div class="admin-note">
+          <b>Пароль.</b> Редакторы статей и расписания, а также загрузка APK защищены паролем администратора — он вводится при открытии раздела и в коде страницы не хранится. Ссылки из этого сборника открываются в новой вкладке, чтобы не терять несохранённые правки.
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="frame" style="border-top:0">
+    <div class="foot-bottom">
+      <span class="hud">© <span id="year">2026</span> ЛинТех 28 · Школа №28, Киров</span>
+      <span class="hud"><a href="index.html" style="color:inherit">← Вернуться на главную</a></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('themeBtn');
+  var saved = null;
+  try { saved = localStorage.getItem('lt28-theme'); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+  if (btn) btn.addEventListener('click', function () {
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('lt28-theme', next); } catch (e) {}
+  });
+  var y = document.getElementById('year');
+  if (y) y.textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>
