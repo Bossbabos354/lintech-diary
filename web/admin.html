@@ -83,6 +83,7 @@ function request(body) {
   const password = tokenEl.value.trim();
   if (!password) throw new Error('Нужен пароль администратора');
   localStorage.setItem(TOKEN_KEY, password);
+  AdminAuth.set(password);
   return AdminAuth.request({ ...body, password, path: 'web/data/' + fileEl.value }).then(data => {
     if (!data.ok && /парол/i.test(String(data.error || ''))) localStorage.removeItem(TOKEN_KEY);
     return data;
