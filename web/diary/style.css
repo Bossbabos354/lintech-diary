@@ -343,6 +343,31 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .segment button.on { background: var(--glass-top); color: var(--text); box-shadow: 0 4px 12px rgba(20, 24, 60, .1); }
 
+/* ---------- бейдж и оформление ---------- */
+.icon-btn { position: relative; }
+.badge {
+  position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 999px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 800;
+  font-style: normal; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+.badge.dot { width: 9px; height: 9px; min-width: 0; padding: 0; position: static; margin-left: auto; }
+
+.bg-choice {
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  padding: 12px 8px; border-radius: 16px; cursor: pointer; font-size: 12.5px; font-weight: 700;
+  border: 1.5px solid transparent; background: rgba(120, 126, 160, .1); color: var(--text2);
+}
+.bg-choice.on { border-color: var(--accent); color: var(--text); background: rgba(90, 90, 242, .1); }
+.bg-prev { display: block; width: 100%; height: 54px; border-radius: 11px; }
+.bg-prev.grad { background: linear-gradient(150deg, #9b86ff, #6fd2ff 55%, #ffa8ce); }
+.bg-prev.photo { background: url(../bg_zhan.jpg) center/cover; }
+.app-ico {
+  width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+  color: #fff; font-weight: 800; font-size: 15px;
+}
+.app-ico.new { background: linear-gradient(140deg, #5a5af2, #9d6bff); }
+.app-ico.old { background: linear-gradient(140deg, #2eb6a6, #2e7dbe); }
+
 /* ---------- всплывающее ---------- */
 .toast {
   position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(12px);
@@ -392,6 +417,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   animation: load 1s cubic-bezier(.3, .8, .3, 1) forwards;
 }
 @keyframes load { to { width: 100%; } }
+.splash-line {
+  margin-top: 10px; min-height: 18px; text-align: center;
+  font-size: 12.5px; font-weight: 700; color: var(--text2); letter-spacing: .3px;
+}
+.splash-line.in { animation: lineIn .22s ease; }
+@keyframes lineIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 @keyframes glow { from { box-shadow: 0 10px 26px rgba(90, 90, 242, .3); } to { box-shadow: 0 16px 40px rgba(90, 90, 242, .55); } }
 @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
 
