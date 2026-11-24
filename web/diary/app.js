@@ -177,7 +177,8 @@ const Diary = (() => {
     session.password = encodeExtStr(hashed);
     session.userId = encodeExtNum(userId);
 
-    try { await post('/auth', { uId: String(userId), act: '1' }); } catch (e) {}
+    // Подтверждение сессии не ждём: куки уже выставлены, экран не должен простаивать.
+    post('/auth', { uId: String(userId), act: '1' }).catch(() => {});
 
     return { fio, uchName: '', uchId: 1, studentId, userId };
   }
