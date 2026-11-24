@@ -366,9 +366,50 @@ const Diary = (() => {
     return results;
   }
 
+
+  // ---- Расчёты оценок (порт GoalMath из Android) ----
+  function weightOf(m) {
+    const w = Number(m && m.weight);
+    return w > 0 ? w : 1;
+  }
+
+  function weightedAverage(list) {
+    let sum = 0, total = 0;
+    (list || []).forEach(m => {
+      const n = parseInt(m.mark, 10);
+      if (isNaN(n)) return;
+      const w = weightOf(m);
+      sum += n * w;
+      total += w;
+    });
+    return total ? sum / total : null;
+  }
+
+  function currentPeriodLessons(subject) {
+    const all = (subject.marks || []).filter(m => !isNaN(parseInt(m.mark, 10)));
+    const withPeriod = all.filter(m => m.periodId != null);
+    if (!withPeriod.length) return all;
+    const latest = withPeriod.reduce((a, b) => ((b.date || 0) >= (a.date || 0) ? b : a));
+    const inPeriod = all.filter(m => m.periodId === latest.periodId);
+    return inPeriod.length ? inPeriod : all;
+  }
+
+  function currentPeriodAverage(subject) {
+    return weightedAverage(currentPeriodLessons(subject));
+  }
+
+  function roundedMark(avg) {
+    if (avg == null) return null;
+    if (avg >= 4.5) return 5;
+    if (avg >= 3.5) return 4;
+    if (avg >= 2.5) return 3;
+    return 2;
+  }
+
   return {
     login, restoreSession, getUserData, getUchYear,
     getStudentClass, getDairy, getSchedule, getMarks,
+    weightedAverage, currentPeriodAverage, roundedMark,
     weekRange, parseArray,
   };
 })();

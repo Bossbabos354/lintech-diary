@@ -597,3 +597,72 @@ button.btn {
 .notif-title { font-weight: 700; font-size: 14px; color: var(--text); }
 .notif-text { color: var(--text-secondary); font-size: 13px; margin-top: 3px; line-height: 1.4; }
 .notif-time { color: var(--text-disabled); font-size: 11px; margin-top: 4px; }
+/* ===== Стеклянный слой (порт дизайна ios26) ===== */
+body {
+  background:
+    radial-gradient(900px 600px at 12% -10%, rgba(124,77,255,.35), transparent 60%),
+    radial-gradient(700px 500px at 95% 0%, rgba(0,191,166,.28), transparent 55%),
+    radial-gradient(800px 600px at 50% 110%, rgba(255,64,129,.22), transparent 60%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+[data-theme="dark"] body {
+  background:
+    radial-gradient(900px 600px at 12% -10%, rgba(124,77,255,.38), transparent 60%),
+    radial-gradient(700px 500px at 95% 0%, rgba(0,191,166,.25), transparent 55%),
+    radial-gradient(800px 600px at 50% 110%, rgba(255,64,129,.20), transparent 60%),
+    var(--background);
+}
+
+.card, .subject-card, .overall, .critical-block {
+  background: rgba(255,255,255,.62);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(20, 10, 50, .08);
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .subject-card,
+[data-theme="dark"] .overall,
+[data-theme="dark"] .critical-block {
+  background: rgba(22,16,38,.62);
+  border-color: rgba(255,255,255,.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
+.navbar {
+  background: rgba(255,255,255,.55);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-top: 1px solid rgba(255,255,255,.5);
+}
+
+[data-theme="dark"] .navbar {
+  background: rgba(18,14,30,.65);
+  border-top-color: rgba(255,255,255,.1);
+}
+
+.subj-avg { display: flex; align-items: center; gap: 8px; }
+.subj-round {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.critical-block { padding: 14px 16px; margin: 0 0 12px; }
+.critical-title { font-weight: 800; font-size: 14px; margin-bottom: 8px; }
+.critical-sub { font-size: 12px; color: var(--text-secondary); }
+.critical-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.critical-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-radius: 999px;
+  background: rgba(239,83,80,.14);
+  border: 1px solid rgba(239,83,80,.35);
+  font-size: 13px; cursor: pointer;
+}
+.critical-chip b { color: var(--error); }
