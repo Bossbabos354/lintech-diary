@@ -228,38 +228,30 @@ async function loadWeek(offset, force) {
 async function loadSchedule(force) {
   if (!S.schedule) {
     const cached = lsGetJson('lt_schedule_cache', null);
-    if (cached && Array.isArray(cached.data)) {
-      S.schedule = cached.data;
-      S.scheduleAt = cached.at || 0;
-    }
+    if (cached && cached.data) { S.schedule = cached.data; S.scheduleAt = cached.at || 0; }
   }
-  const fresh = Date.now() - S.scheduleAt < 15 * 60 * 1000;
+  const fresh = Date.now() - S.scheduleAt < 5 * 60 * 1000;
   if (S.schedule && fresh && !force) return S.schedule;
-  const had = S.schedule;
-  const cid = await ensureClass();
-  S.schedule = await Diary.getSchedule(cid);
-  S.scheduleAt = Date.now();
-  lsSetJson('lt_schedule_cache', { at: S.scheduleAt, data: S.schedule });
-  if (had && !force && S.route.screen === 'schedule') render();
-  return S.schedule;
-}
-
-async function loadBells() {
-  if (S.bells) return S.bells;
   for (const url of ['../data/schedule.json', 'data/schedule.json']) {
     try {
       const r = await fetch(url, { cache: 'no-store' });
       if (!r.ok) continue;
-      const j = await r.json();
-      if (j && j.bells) {
-        S.bells = j.bells;
-        S.classes = Array.isArray(j.classes) ? j.classes : [];
-        return S.bells;
-      }
+      const data = await r.json();
+      if (!data || !data.lessons) continue;
+      S.schedule = data;
+      S.scheduleAt = Date.now();
+      lsSetJson('lt_schedule_cache', { at: S.scheduleAt, data });
+      return S.schedule;
     } catch (e) {}
   }
-  S.bells = { weekday: [], saturday: [] };
-  S.classes = [];
+  if (S.schedule) return S.schedule;
+  throw new Error('Не удалось скачать расписание');
+}
+
+async function loadBells() {
+  const data = await loadSchedule(false);
+  S.bells = data.bells || { weekday: [], saturday: [] };
+  S.classes = Array.isArray(data.classes) ? data.classes : [];
   return S.bells;
 }
 
@@ -564,36 +556,48 @@ function screenSchedule(root) {
 
   const list = el('div');
   root.appendChild(list);
+
+  const cls = Prefs.get('lt_class_name', '');
+  if (!cls) {
+    list.innerHTML = '<div class="card empty"><div class="flag">🏫</div>Класс не выбран' +
+      '<div style="margin-top:6px">Выбери класс, чтобы видеть уроки и звонки</div></div>';
+    const pick = el('button', 'btn', 'Выбрать класс');
+    pick.style.marginTop = '10px';
+    pick.onclick = openClassSheet;
+    list.appendChild(pick);
+    setSub('класс не выбран');
+    return;
+  }
+
   list.innerHTML = '<div class="skeleton"></div>';
+  const key = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'][day];
 
   (async () => {
     try {
-      const [schedule, bells] = await Promise.all([loadSchedule(false), loadBells()]);
-      const weekdayApi = day + 1; // 1 = понедельник
-      const items = schedule.filter((x) => x.weekday === weekdayApi)
-        .sort((a, b) => a.lessonOrder - b.lessonOrder);
-      const table = (day === 5 ? bells.saturday : bells.weekday) || [];
+      const data = await loadSchedule(false);
+      const lessons = (((data.lessons || {})[cls] || {})[key] || []).slice().sort((a, b) => (a.n || 0) - (b.n || 0));
+      const bells = ((day === 5 ? (data.bells || {}).saturday : (data.bells || {}).weekday) || []);
       list.innerHTML = '';
-      if (!items.length) {
-        list.innerHTML = '<div class="empty">На ' + DAYS_FULL[day].toLowerCase() + ' уроков нет</div>';
-        setSub(DAYS_FULL[day]);
+      if (!lessons.length) {
+        list.innerHTML = '<div class="card empty">На ' + DAYS_FULL[day].toLowerCase() + ' уроков нет</div>';
+        setSub('класс ' + cls + ' · ' + DAYS_FULL[day]);
         return;
       }
       const card = el('div', 'card');
-      items.forEach((x) => {
-        const bell = table.find((b) => Number(b.n) === x.lessonOrder);
+      lessons.forEach((x) => {
+        const bell = bells.find((b) => Number(b.n) === Number(x.n));
         const row = el('div', 'sched-row');
         row.innerHTML =
-          '<div class="time"><b>' + (bell ? esc(bell.start) + '–' + esc(bell.end) : x.lessonOrder + ' урок') + '</b>' +
-            (bell ? x.lessonOrder + '-й урок' : '') + '</div>' +
-          '<div style="flex:1;min-width:0"><div class="sched-subj">' + esc(x.subjectName) + '</div>' +
-            '<div class="sched-meta">' + [x.teacherFio, x.room ? 'каб. ' + x.room : ''].filter(Boolean).map(esc).join(' · ') + '</div></div>';
+          '<div class="time"><b>' + (bell ? esc(bell.start) + '–' + esc(bell.end) : (x.n || '') + ' урок') + '</b>' +
+            (bell ? x.n + '-й урок' : '') + '</div>' +
+          '<div style="flex:1;min-width:0"><div class="sched-subj">' + esc(x.subject || '') + '</div>' +
+            '<div class="sched-meta">' + [x.teacher, x.room ? 'каб. ' + x.room : ''].filter(Boolean).map(esc).join(' · ') + '</div></div>';
         card.appendChild(row);
       });
       list.appendChild(card);
-      setSub(DAYS_FULL[day]);
+      setSub('класс ' + cls + ' · ' + DAYS_FULL[day]);
     } catch (e) {
-      list.innerHTML = '<div class="card empty">Сайт с расписанием недоступен<br><span class="muted">' + esc(e.message) + '</span></div>';
+      list.innerHTML = '<div class="card empty">Расписание недоступно<br><span class="muted">' + esc(e.message) + '</span></div>';
     }
   })();
 }
@@ -1288,25 +1292,28 @@ function screenExport(root) {
 
   card.querySelector('[data-act="ics"]').onclick = async () => {
     try {
-      const schedule = await loadSchedule(false);
-      const bells = await loadBells();
+      const data = await loadSchedule(false);
+      const cls = Prefs.get('lt_class_name', '') || (data.classes || [])[0];
+      if (!cls) throw new Error('Класс не выбран');
       const { monday } = Diary.weekRange(0);
       const pad = (n) => String(n).padStart(2, '0');
       const stamp = (d) => d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+      const keys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
       const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//LinTech 28//RU'];
-      schedule.forEach((x) => {
-        if (x.weekday < 1 || x.weekday > 6) return;
+      keys.forEach((key, i) => {
         const d = new Date(monday);
-        d.setDate(monday.getDate() + (x.weekday - 1));
-        const table = (x.weekday === 6 ? bells.saturday : bells.weekday) || [];
-        const bell = table.find((b) => Number(b.n) === x.lessonOrder);
-        const start = bell ? bell.start : '08:30';
-        const end = bell ? bell.end : '09:15';
-        lines.push('BEGIN:VEVENT', 'UID:' + x.subjectId + '-' + stamp(d) + '-' + x.lessonOrder + '@lintech28',
-          'DTSTAMP:' + stamp(d) + 'T000000', 'DTSTART;TZID=Europe/Kirov:' + stamp(d) + 'T' + start.replace(':', '') + '00',
-          'DTEND;TZID=Europe/Kirov:' + stamp(d) + 'T' + end.replace(':', '') + '00',
-          'SUMMARY:' + (x.subjectName || 'Урок') + (x.room ? ' (каб. ' + x.room + ')' : ''),
-          'END:VEVENT');
+        d.setDate(monday.getDate() + i);
+        const bells = ((key === 'sat' ? (data.bells || {}).saturday : (data.bells || {}).weekday) || []);
+        (((data.lessons || {})[cls] || {})[key] || []).forEach((x) => {
+          const bell = bells.find((b) => Number(b.n) === Number(x.n));
+          const start = bell ? bell.start : '08:30';
+          const end = bell ? bell.end : '09:15';
+          lines.push('BEGIN:VEVENT', 'UID:' + cls + '-' + stamp(d) + '-' + x.n + '@lintech28',
+            'DTSTAMP:' + stamp(d) + 'T000000', 'DTSTART;TZID=Europe/Kirov:' + stamp(d) + 'T' + start.replace(':', '') + '00',
+            'DTEND;TZID=Europe/Kirov:' + stamp(d) + 'T' + end.replace(':', '') + '00',
+            'SUMMARY:' + (x.subject || 'Урок') + (x.room ? ' (каб. ' + x.room + ')' : ''),
+            'END:VEVENT');
+        });
       });
       lines.push('END:VCALENDAR');
       download('lintech-schedule.ics', lines.join('\r\n'), 'text/calendar;charset=utf-8');
