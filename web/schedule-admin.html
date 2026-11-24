@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Расписание и звонки | Админка ЛинТех 28</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+<div class="admin-shell">
+
+  <header class="admin-bar">
+    <a class="bar-brand" href="tools.html">ЛинТех&nbsp;28</a>
+    <span class="bar-title">Расписание и звонки</span>
+    <div class="bar-right">
+      <a class="bar-btn" href="tools.html">Все инструменты</a>
+      <button class="bar-btn" id="logoutBtn" type="button">Выйти</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+
+    <div class="admin-head">
+      <div>
+        <h1>Расписание и звонки</h1>
+        <p class="sub">Звонки и уроки по классам. Сохраняется в <code>schedule.json</code>, откуда данные берёт вкладка «Расписание».</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn secondary" type="button" onclick="location.reload()">Сбросить</button>
+        <button class="btn primary" type="button" onclick="save()">Сохранить</button>
+      </div>
+    </div>
+
+    <div class="msg" id="msg"></div>
+
+    <!-- Вход -->
+    <div class="panel auth-panel" id="authCard" style="display:none">
+      <h2>Вход</h2>
+      <label for="pw">Пароль администратора</label>
+      <input type="password" id="pw" placeholder="GitHub-токен (Contents: Read and write)" autocomplete="current-password">
+      <div class="hint">Один пароль на все инструменты: загрузку версий, статьи и расписание.</div>
+      <div class="btns">
+        <button class="btn primary" type="button" onclick="login()">Войти</button>
+      </div>
+    </div>
+
+    <div id="editor" style="display:none">
+
+      <div class="panel">
+        <h2>Классы</h2>
+        <label for="classesInput">Список классов через запятую</label>
+        <input type="text" id="classesInput" placeholder="7А, 7Б, 8А" oninput="onClassesInput(this.value)">
+        <div class="hint">Классы появятся в настройках приложения для выбора.</div>
+      </div>
+
+      <div class="panel">
+        <h2>Звонки</h2>
+        <div class="admin-cols">
+          <div>
+            <label>Понедельник – пятница</label>
+            <div id="bellsWeekday"></div>
+            <div class="btns"><button class="btn secondary" type="button" onclick="addBell('weekday')">+ звонок</button></div>
+          </div>
+          <div>
+            <label>Суббота</label>
+            <div id="bellsSaturday"></div>
+            <div class="btns"><button class="btn secondary" type="button" onclick="addBell('saturday')">+ звонок</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Уроки по классам</h2>
+        <div class="admin-dayrow">
+          <div>
+            <label for="classSelect">Класс</label>
+            <select id="classSelect" onchange="renderLessons()"></select>
+          </div>
+          <div>
+            <label for="daySelect">День</label>
+            <select id="daySelect" onchange="renderLessons()">
+              <option value="mon">Понедельник</option>
+              <option value="tue">Вторник</option>
+              <option value="wed">Среда</option>
+              <option value="thu">Четверг</option>
+              <option value="fri">Пятница</option>
+              <option value="sat">Суббота</option>
+            </select>
+          </div>
+        </div>
+        <div id="lessonsBox" style="margin-top:12px"></div>
+        <div class="btns"><button class="btn secondary" type="button" onclick="addLesson()">+ урок</button></div>
+        <div class="hint">Номер урока связывается со звонком: в приложении подставится время начала и конца.</div>
+      </div>
+
+      <div class="btns">
+        <button class="btn primary" type="button" onclick="save()">Сохранить расписание</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="admin-foot">
+    <span class="hud">© <span id="year">2026</span> ЛинТех 28 · Школа №28, Киров</span>
+    <span class="hud"><a href="index.html">На главную</a></span>
+  </footer>
+</div>
+
+<script src="admin-auth.js"></script>
+<script>
+var GH_REPO = 'Bossbabos354/lintech-diary';
+var GH_PATH = 'web/data/schedule.json';
+var GH_URL = 'https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_PATH;
+var sha = null;
+var token = '';
+var state = { classes: [], bells: { weekday: [], saturday: [] }, lessons: {} };
+var DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+function $(id) { return document.getElementById(id); }
+function setMsg(t, ok) { var el = $('msg'); el.className = 'msg ' + (ok ? 'ok' : 'err'); el.textContent = t; }
+function clearMsg() { $('msg').className = 'msg'; $('msg').textContent = ''; }
+
+function ghHeaders() {
+  return {
+    'Authorization': 'Bearer ' + token,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
+}
+function b64decode(b64) {
+  var bin = atob(String(b64).replace(/\s/g, ''));
+  var bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+function b64encode(str) {
+  var bytes = new TextEncoder().encode(str);
+  var bin = '';
+  for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function api(body, cb) {
+  if (!token) { setMsg('Нужен GitHub-токен', false); cb({ ok: false }); return; }
+
+  if (body.action === 'load') {
+    fetch(GH_URL + '?ref=main', { headers: ghHeaders() })
+      .then(function (r) {
+        if (!r.ok) throw new Error('GitHub: HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (j) {
+        sha = j.sha;
+        var data = JSON.parse(b64decode(j.content));
+        cb({ ok: true, schedule: data });
+      })
+      .catch(function (e) { setMsg(e.message, false); cb({ ok: false }); });
+    return;
+  }
+
+  if (body.action === 'save') {
+    var payload = {
+      message: 'Админка: обновлено расписание',
+      content: b64encode(JSON.stringify(body.schedule, null, 2) + '\n'),
+      branch: 'main'
+    };
+    if (sha) payload.sha = sha;
+    fetch(GH_URL, {
+      method: 'PUT',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, ghHeaders()),
+      body: JSON.stringify(payload)
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error('GitHub: HTTP ' + r.status + (j && j.message ? ' — ' + j.message : ''));
+          return j;
+        });
+      })
+      .then(function (j) {
+        sha = j.content.sha;
+        cb({ ok: true, message: 'Сохранено коммитом ' + j.commit.sha.slice(0, 7) });
+      })
+      .catch(function (e) { setMsg(e.message, false); cb({ ok: false }); });
+  }
+}
+
+/* ====== Вход ====== */
+function enterApp() {
+  api({ action: 'load' }, function (d) {
+    if (!d || !d.ok) {
+      setMsg((d && d.message) || 'Ошибка загрузки', false);
+      return;
+    }
+    normalize(d.schedule || {});
+    clearMsg();
+    $('authCard').style.display = 'none';
+    $('editor').style.display = 'block';
+    renderAll();
+  });
+}
+
+function login() {
+  token = $('pw').value.trim();
+  if (!token) { setMsg('Введите GitHub-токен', false); return; }
+  AdminAuth.set(token);
+  enterApp();
+}
+
+token = AdminAuth.init({ input: 'pw', logout: 'logoutBtn' });
+if (token) {
+  enterApp();
+} else {
+  $('authCard').style.display = 'block';
+}
+
+/* ====== Данные ====== */
+function normalize(s) {
+  state.classes = Array.isArray(s.classes) ? s.classes : [];
+  state.bells = s.bells && typeof s.bells === 'object' ? s.bells : { weekday: [], saturday: [] };
+  if (!Array.isArray(state.bells.weekday)) state.bells.weekday = [];
+  if (!Array.isArray(state.bells.saturday)) state.bells.saturday = [];
+  state.lessons = s.lessons && typeof s.lessons === 'object' ? s.lessons : {};
+  state.classes.forEach(function (c) {
+    if (!state.lessons[c]) state.lessons[c] = {};
+    DAYS.forEach(function (d) { if (!Array.isArray(state.lessons[c][d])) state.lessons[c][d] = []; });
+  });
+}
+
+function renderAll() {
+  $('classesInput').value = state.classes.join(', ');
+  renderBells('weekday');
+  renderBells('saturday');
+  renderClassSelect();
+  renderLessons();
+}
+
+function onClassesInput(v) {
+  state.classes = v.split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 0; });
+  state.classes.forEach(function (c) {
+    if (!state.lessons[c]) state.lessons[c] = {};
+    DAYS.forEach(function (d) { if (!Array.isArray(state.lessons[c][d])) state.lessons[c][d] = []; });
+  });
+  renderClassSelect();
+}
+
+function renderClassSelect() {
+  var sel = $('classSelect');
+  var cur = sel.value;
+  sel.innerHTML = '';
+  state.classes.forEach(function (c) {
+    var o = document.createElement('option');
+    o.value = c;
+    o.textContent = c;
+    sel.appendChild(o);
+  });
+  if (cur && state.classes.indexOf(cur) >= 0) sel.value = cur;
+}
+
+function renderBells(kind) {
+  var box = $(kind === 'weekday' ? 'bellsWeekday' : 'bellsSaturday');
+  box.innerHTML = '';
+  state.bells[kind].forEach(function (b, i) {
+    var row = document.createElement('div');
+    row.className = 'admin-row';
+    row.innerHTML =
+      '<input class="n" type="number" min="1" value="' + (b.n || i + 1) + '" oninput="updateBell(\'' + kind + '\',' + i + ',\'n\',this.value)">' +
+      '<input class="time" type="time" value="' + (b.start || '') + '" oninput="updateBell(\'' + kind + '\',' + i + ',\'start\',this.value)">' +
+      '<input class="time" type="time" value="' + (b.end || '') + '" oninput="updateBell(\'' + kind + '\',' + i + ',\'end\',this.value)">' +
+      '<button class="del" type="button" onclick="delBell(\'' + kind + '\',' + i + ')">✕</button>';
+    box.appendChild(row);
+  });
+}
+
+function updateBell(kind, i, field, val) {
+  if (!state.bells[kind][i]) return;
+  state.bells[kind][i][field] = field === 'n' ? parseInt(val, 10) || 0 : val;
+}
+function addBell(kind) {
+  var arr = state.bells[kind];
+  arr.push({ n: arr.length + 1, start: '', end: '' });
+  renderBells(kind);
+}
+function delBell(kind, i) { state.bells[kind].splice(i, 1); renderBells(kind); }
+
+function renderLessons() {
+  var cls = $('classSelect').value;
+  var day = $('daySelect').value;
+  var box = $('lessonsBox');
+  box.innerHTML = '';
+  if (!cls) { box.innerHTML = '<p class="hint">Сначала добавьте классы.</p>'; return; }
+  var list = (state.lessons[cls] && state.lessons[cls][day]) || [];
+  list.forEach(function (l, i) {
+    var row = document.createElement('div');
+    row.className = 'admin-row';
+    row.innerHTML =
+      '<input class="n" type="number" min="1" value="' + (l.n || i + 1) + '" oninput="updateLesson(\'' + cls + '\',\'' + day + '\',' + i + ',\'n\',this.value)">' +
+      '<input class="grow" type="text" placeholder="Предмет" value="' + (l.subject || '') + '" oninput="updateLesson(\'' + cls + '\',\'' + day + '\',' + i + ',\'subject\',this.value)">' +
+      '<input class="grow" type="text" placeholder="Учитель" value="' + (l.teacher || '') + '" oninput="updateLesson(\'' + cls + '\',\'' + day + '\',' + i + ',\'teacher\',this.value)">' +
+      '<input class="n" type="text" placeholder="каб." value="' + (l.room || '') + '" oninput="updateLesson(\'' + cls + '\',\'' + day + '\',' + i + ',\'room\',this.value)">' +
+      '<button class="del" type="button" onclick="delLesson(\'' + cls + '\',\'' + day + '\',' + i + ')">✕</button>';
+    box.appendChild(row);
+  });
+}
+
+function updateLesson(cls, day, i, field, val) {
+  var arr = state.lessons[cls][day];
+  if (!arr[i]) return;
+  arr[i][field] = field === 'n' ? parseInt(val, 10) || 0 : val;
+}
+function addLesson() {
+  var cls = $('classSelect').value;
+  var day = $('daySelect').value;
+  if (!cls) return;
+  var arr = state.lessons[cls][day];
+  arr.push({ n: arr.length + 1, subject: '', teacher: '', room: '' });
+  renderLessons();
+}
+function delLesson(cls, day, i) { state.lessons[cls][day].splice(i, 1); renderLessons(); }
+
+function save() {
+  if (!token) { saveLogin(); return; }
+  api({ action: 'save', password: token, schedule: state }, function (d) {
+    setMsg((d && d.message) || (d && d.ok ? 'Сохранено' : 'Ошибка'), !!(d && d.ok));
+    if (!AdminAuth.get()) $('authCard').style.display = 'block';
+  });
+}
+
+/* Если пароля нет — просим войти и после входа сохраняем */
+function saveLogin() {
+  var pw = prompt('GitHub-токен');
+  if (!pw) return;
+  token = pw;
+  AdminAuth.set(pw);
+  save();
+}
+
+var year = document.getElementById('year');
+if (year) year.textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
