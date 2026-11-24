@@ -29,3 +29,5 @@ local.properties
 signing.properties
 *.keystore
 *.jks
+updateserver/config.php
+/promo/

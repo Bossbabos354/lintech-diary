@@ -1,0 +1,12 @@
+# Отдаём JSON без кэширования
+<FilesMatch "update\.json$">
+  Header set Cache-Control "no-store, no-cache, must-revalidate"
+  Header set Pragma "no-cache"
+  ExpiresActive On
+  ExpiresDefault "now"
+</FilesMatch>
+
+# APK можно скачивать напрямую
+<FilesMatch "\.apk$">
+  Header set Content-Disposition "attachment"
+</FilesMatch>
