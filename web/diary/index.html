@@ -362,13 +362,9 @@ function renderMarks() {
         Prefs.setClassId(cid);
       }
       const subjects = await Diary.getMarks(cid, sid, Prefs.uchYear());
-      // Средний балл — средневзвешенный за текущий период, как в журнале и в приложении.
-      const subjectAvgs = subjects
-        .map(s => Diary.currentPeriodAverage(s))
-        .filter(v => v != null);
-      const avg = subjectAvgs.length
-        ? subjectAvgs.reduce((a, b) => a + b, 0) / subjectAvgs.length
-        : null;
+      // Средний балл — взвешенный по всем оценкам текущего периода, как в приложении.
+      const periodMarks = subjects.flatMap(s => Diary.currentPeriodLessons(s));
+      const avg = Diary.weightedAverage(periodMarks);
 
       cont.innerHTML = '';
       cont.appendChild(renderOverall(avg));
@@ -389,10 +385,15 @@ function renderMarks() {
 }
 
 function renderCritical(subjects) {
+  // Как в приложении: тревожит средний ниже 3,5 или три и более «2».
   const weak = subjects
-    .map(s => ({ s, avg: Diary.currentPeriodAverage(s) }))
-    .filter(x => x.avg != null && x.avg < 3.5)
-    .sort((a, b) => a.avg - b.avg);
+    .map(s => {
+      const lessons = Diary.currentPeriodLessons(s);
+      const twos = lessons.filter(m => parseInt(m.mark, 10) <= 2).length;
+      return { s, avg: Diary.weightedAverage(lessons), twos };
+    })
+    .filter(x => (x.avg != null && x.avg < 3.5) || x.twos >= 3)
+    .sort((a, b) => (a.avg == null ? 99 : a.avg) - (b.avg == null ? 99 : b.avg));
   const wrap = el('div', 'critical-block');
   if (!weak.length) {
     wrap.innerHTML = '<div class="critical-title">Всё под контролем</div>' +
@@ -401,10 +402,12 @@ function renderCritical(subjects) {
   }
   wrap.innerHTML = '<div class="critical-title">Требуют внимания</div>';
   const list = el('div', 'critical-list');
-  weak.forEach(({ s, avg }) => {
+  weak.forEach(({ s, avg, twos }) => {
     const chip = el('div', 'critical-chip');
+    const label = avg == null ? 'нет оценок' : avg.toFixed(2).replace('.', ',');
+    const twosText = twos >= 3 ? ' · ' + twos + ' «2»' : '';
     chip.innerHTML = '<span>' + escapeHtml(s.subjectName) + '</span><b>' +
-      avg.toFixed(2).replace('.', ',') + '</b>';
+      label + twosText + '</b>';
     chip.onclick = () => openGoalSheet(s, 'YEAR');
     list.appendChild(chip);
   });
@@ -462,9 +465,9 @@ function renderSubject(s) {
 
   // Подсказка по цели / «Узнать больше» — как в приложении
   const goal = findGoal(s.subjectId, 'YEAR');
-  const goalMarks = goal ? goalMarksFor(s, goal.periodKey) : [];
-  const hint = goal ? goalHint(goalMarks, goal) : 'Поставь цель по предмету';
-  const achieved = goal ? goalNeeded(goalMarks, goal.targetMark, goal.allowedMarks) === 0 : false;
+  const goalMarks = goal ? Diary.marksForPeriod(s, goal.periodKey) : [];
+  const hint = goal ? Diary.hint(goalMarks, goal) : 'Поставь цель по предмету';
+  const achieved = goal ? Diary.needed(goalMarks, goal.targetMark, goal.allowedMarks) === 0 : false;
   card.innerHTML += `<div class="goal-hint${achieved ? ' ok' : ''}">` +
     `<span>${escapeHtml(hint)}</span><b>Узнать больше →</b></div>`;
 
@@ -821,18 +824,10 @@ function renderNotifRow(n, unread) {
 
 // ---------------- Цели ----------------
 const GOALS_KEY = 'diary_goals';
-const GOAL_PERIODS = [
-  { key: 'Q1', label: '1 четверть', ids: [360000] },
-  { key: 'Q2', label: '2 четверть', ids: [360001] },
-  { key: 'Q3', label: '3 четверть', ids: [360002] },
-  { key: 'Q4', label: '4 четверть', ids: [360003] },
-  { key: 'H1', label: '1 полугодие', ids: [360000, 360001] },
-  { key: 'H2', label: '2 полугодие', ids: [360002, 360003] },
-  { key: 'YEAR', label: 'Учебный год', ids: [] }
-];
+const GOAL_PERIODS = Diary.periods;
 
 function goalPeriod(key) {
-  return GOAL_PERIODS.find(p => p.key === key) || GOAL_PERIODS[GOAL_PERIODS.length - 1];
+  return Diary.period(key);
 }
 function loadGoals() {
   try { const a = JSON.parse(localStorage.getItem(GOALS_KEY) || '[]'); return Array.isArray(a) ? a : []; }
@@ -851,45 +846,7 @@ function removeGoal(subjectId, periodKey) {
   saveGoals(loadGoals().filter(g => !(g.subjectId === subjectId && g.periodKey === periodKey)));
 }
 
-function goalThreshold(t) { return t === 5 ? 4.5 : t === 4 ? 3.5 : t === 3 ? 2.5 : 1.5; }
 
-function goalMarksFor(subject, periodKey) {
-  const p = goalPeriod(periodKey);
-  const withPeriod = subject.marks.filter(m => m.periodId != null);
-  let filtered;
-  if (!p.ids.length) filtered = subject.marks;
-  else if (!withPeriod.length) filtered = subject.marks;
-  else filtered = subject.marks.filter(m => p.ids.includes(m.periodId));
-  return filtered.map(m => parseInt(m.mark, 10)).filter(n => !isNaN(n));
-}
-function goalAverage(marks) {
-  return marks.length ? marks.reduce((a, b) => a + b, 0) / marks.length : null;
-}
-function goalRounded(avg) {
-  if (avg == null) return null;
-  return avg >= 4.5 ? 5 : avg >= 3.5 ? 4 : avg >= 2.5 ? 3 : 2;
-}
-function goalNeeded(marks, target, allowed) {
-  if (!allowed || !allowed.length) return null;
-  const t = goalThreshold(target);
-  const n = marks.length;
-  const sum = marks.reduce((a, b) => a + b, 0);
-  if (n > 0 && sum / n >= t) return 0;
-  if (n === 0 && t <= 0) return 0;
-  const best = Math.max.apply(null, allowed);
-  if (best < t) return null;
-  const k = Math.ceil((t * n - sum) / (best - t));
-  return Math.max(1, k);
-}
-function goalHint(marks, goal) {
-  const need = goalNeeded(marks, goal.targetMark, goal.allowedMarks);
-  const avg = goalAverage(marks);
-  const avgText = avg == null ? 'нет оценок' : avg.toFixed(2).replace('.', ',');
-  if (need == null) return 'С набором ' + goal.allowedMarks.join('/') + ' цели не достичь';
-  if (need === 0) return 'Цель достигнута! Средний: ' + avgText;
-  const best = Math.max.apply(null, goal.allowedMarks);
-  return 'Нужно ещё ' + need + ' × «' + best + '». Сейчас средний: ' + avgText;
-}
 function goalPlural(n) {
   const m10 = n % 10, m100 = n % 100;
   if (m10 === 1 && m100 !== 11) return 'ку';
@@ -943,9 +900,9 @@ function renderGoals() {
 
 function renderGoalCard(goal, subject) {
   const card = el('div', 'card subject-card');
-  const marks = subject ? goalMarksFor(subject, goal.periodKey) : [];
-  const hint = subject ? goalHint(marks, goal) : 'Нет данных об оценках';
-  const achieved = subject ? goalNeeded(marks, goal.targetMark, goal.allowedMarks) === 0 : false;
+  const marks = subject ? Diary.marksForPeriod(subject, goal.periodKey) : [];
+  const hint = subject ? Diary.hint(marks, goal) : 'Нет данных об оценках';
+  const achieved = subject ? Diary.needed(marks, goal.targetMark, goal.allowedMarks) === 0 : false;
 
   const head = el('div', 'goal-head');
   const av = el('div', 'avatar', escapeHtml(goal.subjectName.slice(0, 2)));
@@ -1005,17 +962,17 @@ function openGoalSheet(subject, initialPeriodKey) {
   };
 
   function paint() {
-    const marks = goalMarksFor(subject, gs.periodKey);
-    const avg = goalAverage(marks);
-    const rounded = goalRounded(avg);
+    const marks = Diary.marksForPeriod(subject, gs.periodKey);
+    const avg = Diary.weightedAverage(marks);
+    const rounded = Diary.roundedMark(avg);
     const allowedArr = Array.from(gs.allowed);
-    const needed = goalNeeded(marks, gs.targetMark, allowedArr);
+    const needed = Diary.needed(marks, gs.targetMark, allowedArr);
     const avgText = avg == null ? '—' : avg.toFixed(2).replace('.', ',');
 
     const marksChips = marks.length
       ? marks.map(m => {
-          const st = markStat(String(m));
-          return '<span class="gs-chip" style="background:' + hexToAlpha(bgHex(st.color)) + ';color:' + st.color + '">' + m + '</span>';
+          const st = markStat(String(m.mark));
+          return '<span class="gs-chip" style="background:' + hexToAlpha(bgHex(st.color)) + ';color:' + st.color + '">' + m.mark + '</span>';
         }).join('')
       : '<span style="color:var(--text-secondary);font-size:14px">Оценок за этот период нет</span>';
 

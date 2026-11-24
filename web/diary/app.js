@@ -387,10 +387,9 @@ const Diary = (() => {
 
   function currentPeriodLessons(subject) {
     const all = (subject.marks || []).filter(m => !isNaN(parseInt(m.mark, 10)));
-    const withPeriod = all.filter(m => m.periodId != null);
-    if (!withPeriod.length) return all;
-    const latest = withPeriod.reduce((a, b) => ((b.date || 0) >= (a.date || 0) ? b : a));
-    const inPeriod = all.filter(m => m.periodId === latest.periodId);
+    const id = currentPeriodId(subject);
+    if (id == null) return all;
+    const inPeriod = all.filter(m => m.periodId === id);
     return inPeriod.length ? inPeriod : all;
   }
 
@@ -406,10 +405,86 @@ const Diary = (() => {
     return 2;
   }
 
+  // Периоды как в приложении: четверти, полугодия, год.
+  const periods = [
+    { key: 'Q1', label: '1 четверть', ids: [360000] },
+    { key: 'Q2', label: '2 четверть', ids: [360001] },
+    { key: 'Q3', label: '3 четверть', ids: [360002] },
+    { key: 'Q4', label: '4 четверть', ids: [360003] },
+    { key: 'H1', label: '1 полугодие', ids: [360000, 360001] },
+    { key: 'H2', label: '2 полугодие', ids: [360002, 360003] },
+    { key: 'YEAR', label: 'Учебный год', ids: [] }
+  ];
+
+  function period(key) {
+    return periods.find(p => p.key === key) || periods[periods.length - 1];
+  }
+
+  function currentPeriodId(subject) {
+    const withPeriod = (subject.marks || []).filter(m => m.periodId != null);
+    if (!withPeriod.length) return null;
+    return withPeriod.reduce((a, b) => ((b.date || 0) >= (a.date || 0) ? b : a)).periodId;
+  }
+
+  // Оценки предмета за выбранный период; если привязки к периодам нет — все.
+  function marksForPeriod(subject, key) {
+    const p = period(key);
+    const all = subject.marks || [];
+    const withPeriod = all.filter(m => m.periodId != null);
+    let filtered = all;
+    if (p.ids.length && withPeriod.length) {
+      const inPeriod = all.filter(m => p.ids.indexOf(m.periodId) >= 0);
+      filtered = inPeriod.length ? inPeriod : all;
+    }
+    return filtered.filter(m => !isNaN(parseInt(m.mark, 10)));
+  }
+
+  function threshold(target) {
+    if (target === 5) return 4.5;
+    if (target === 4) return 3.5;
+    if (target === 3) return 2.5;
+    return 1.5;
+  }
+
+  function average(list) {
+    const nums = (list || []).filter(n => typeof n === 'number' && !isNaN(n));
+    return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+  }
+
+  // Сколько оценок нужно до цели. Новая оценка идёт с весом 1, как в приложении.
+  function needed(lessons, target, allowed) {
+    if (!allowed || !allowed.length) return null;
+    const t = threshold(target);
+    let sum = 0, total = 0;
+    (lessons || []).forEach(m => {
+      const n = parseInt(m.mark, 10);
+      if (isNaN(n)) return;
+      const w = weightOf(m);
+      sum += n * w;
+      total += w;
+    });
+    if (total > 0 && sum / total >= t) return 0;
+    if (total === 0 && t <= 0) return 0;
+    const best = Math.max.apply(null, allowed);
+    if (best < t) return null;
+    return Math.max(1, Math.ceil((t * total - sum) / (best - t)));
+  }
+
+  function hint(lessons, goal) {
+    const need = needed(lessons, goal.targetMark, goal.allowedMarks);
+    const avg = weightedAverage(lessons);
+    const avgText = avg == null ? 'нет оценок' : avg.toFixed(2).replace('.', ',');
+    if (need == null) return 'С набором ' + goal.allowedMarks.join('/') + ' цели не достичь';
+    if (need === 0) return 'Цель достигнута! Средний: ' + avgText;
+    return 'Нужно ещё ' + need + ' × «' + Math.max.apply(null, goal.allowedMarks) + '». Сейчас средний: ' + avgText;
+  }
+
   return {
     login, restoreSession, getUserData, getUchYear,
     getStudentClass, getDairy, getSchedule, getMarks,
-    weightedAverage, currentPeriodAverage, roundedMark,
+    weightedAverage, currentPeriodAverage, currentPeriodLessons, roundedMark,
+    periods, period, currentPeriodId, marksForPeriod,
+    threshold, average, needed, hint,
     weekRange, parseArray,
   };
 })();
