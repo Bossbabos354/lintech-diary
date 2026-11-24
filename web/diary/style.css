@@ -366,13 +366,33 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
+.icon {
+  display: block; stroke: currentColor; fill: none;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.icon-btn .icon { pointer-events: none; }
+.tab .ico { display: flex; align-items: center; justify-content: center; }
+
 .splash {
   position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
   background: linear-gradient(160deg, var(--bg), var(--bg2));
   transition: opacity .4s ease;
 }
 .splash.out { opacity: 0; pointer-events: none; }
-.splash .logo { animation: pop .7s cubic-bezier(.2, .8, .2, 1); }
+.splash .logo { animation: pop .7s cubic-bezier(.2, .8, .2, 1); text-align: center; }
+.splash .logo-badge { animation: glow 1.4s ease-in-out infinite alternate; }
+.splash-bar {
+  position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+  width: 120px; height: 3px; border-radius: 2px; overflow: hidden;
+  background: rgba(120, 126, 160, .22);
+}
+.splash-bar i {
+  display: block; height: 100%; width: 0; border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  animation: load 1s cubic-bezier(.3, .8, .3, 1) forwards;
+}
+@keyframes load { to { width: 100%; } }
+@keyframes glow { from { box-shadow: 0 10px 26px rgba(90, 90, 242, .3); } to { box-shadow: 0 16px 40px rgba(90, 90, 242, .55); } }
 @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
 
 @media (max-width: 380px) {

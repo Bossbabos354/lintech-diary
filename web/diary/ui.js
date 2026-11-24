@@ -233,9 +233,23 @@ function closeSheet() {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 
 // ---------------- шапка ----------------
-const ICONS = {
-  dairy: '📖', schedule: '🗓', marks: '⭐', goals: '🚩', events: '🎈', settings: '⚙️',
+const ICON_PATHS = {
+  dairy: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v18H6.5A2.5 2.5 0 0 1 4 18.5z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v18h4.5A2.5 2.5 0 0 0 20 18.5z"/>',
+  schedule: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+  marks: '<path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.3l6.1-.7z"/>',
+  goals: '<path d="M5 21V4"/><path d="M5 4h11l-2 3 2 3H5"/>',
+  events: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M8.5 15h7"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L6 10.5a7 7 0 0 0 0 2L4 14l2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/>',
+  back: '<path d="m15 5-7 7 7 7"/>',
+  left: '<path d="m14 6-6 6 6 6"/>',
+  right: '<path d="m10 6 6 6-6 6"/>',
+  homework: '<path d="M5 4h9l5 5v11H5z"/><path d="M14 4v5h5"/>',
 };
+function icon(name, size) {
+  return '<svg class="icon" viewBox="0 0 24 24" width="' + (size || 22) + '" height="' + (size || 22) +
+    '" aria-hidden="true">' + (ICON_PATHS[name] || '') + '</svg>';
+}
 function renderHeader() {
   const h = $('header');
   const r = S.route;
@@ -254,9 +268,9 @@ function renderHeader() {
   };
   const [title, sub] = titles[r.screen] || ['ЛинТех 28', ''];
   const actions = [];
-  if (!isTab) actions.push('<button class="icon-btn" data-act="back" aria-label="Назад">‹</button>');
-  if (isTab) actions.push('<button class="icon-btn" data-act="search" aria-label="Поиск">⌕</button>');
-  actions.push('<button class="icon-btn" data-act="settings" aria-label="Настройки">⚙</button>');
+  if (!isTab) actions.push('<button class="icon-btn" data-act="back" aria-label="Назад">' + icon('back', 20) + '</button>');
+  if (isTab) actions.push('<button class="icon-btn" data-act="search" aria-label="Поиск">' + icon('search', 20) + '</button>');
+  actions.push('<button class="icon-btn" data-act="settings" aria-label="Настройки">' + icon('settings', 20) + '</button>');
   h.innerHTML =
     '<div style="flex:1;min-width:0"><h1>' + esc(title) + '</h1>' +
       (sub ? '<div class="sub" id="h-sub">' + esc(sub) + '</div>' : '<div class="sub" id="h-sub"></div>') +
@@ -284,7 +298,7 @@ function renderTabbar() {
   bar.innerHTML = TABS.map((t) => {
     const names = { dairy: 'Дневник', schedule: 'Расписание', marks: 'Оценки', goals: 'Цели', events: 'События' };
     return '<button class="tab' + (t === tab ? ' on' : '') + '" data-tab="' + t + '">' +
-      '<span class="ico">' + ICONS[t] + '</span><span>' + names[t] + '</span></button>';
+      '<span class="ico">' + icon(t, 21) + '</span><span>' + names[t] + '</span></button>';
   }).join('');
   bar.querySelectorAll('[data-tab]').forEach((b) => {
     b.onclick = () => { S.weekOffset = S.weekOffset || 0; go({ screen: b.dataset.tab, tab: b.dataset.tab }); };
@@ -313,10 +327,10 @@ function screenDairy(root) {
   const { monday, sunday } = Diary.weekRange(offset);
   const bar = el('div', 'weekbar');
   bar.innerHTML =
-    '<button class="icon-btn" data-w="-1" aria-label="Предыдущая неделя">‹</button>' +
+    '<button class="icon-btn" data-w="-1" aria-label="Предыдущая неделя">' + icon('left', 18) + '</button>' +
     '<div class="label">' + fmtDM(monday) + ' — ' + fmtDM(sunday) + '</div>' +
     (offset !== 0 ? '<button class="pill-btn" data-w="0">Сегодня</button>' : '') +
-    '<button class="icon-btn" data-w="1" aria-label="Следующая неделя">›</button>';
+    '<button class="icon-btn" data-w="1" aria-label="Следующая неделя">' + icon('right', 18) + '</button>';
   root.appendChild(bar);
   bar.querySelectorAll('[data-w]').forEach((b) => {
     b.onclick = () => { S.weekOffset = Number(b.dataset.w) === 0 ? 0 : offset + Number(b.dataset.w); render(); };
@@ -360,7 +374,7 @@ function screenDairy(root) {
             '<div class="lnum">' + it.lessonNumber + '</div>' +
             '<div class="lbody"><div class="lsubj">' + esc(it.subjectName) + '</div>' +
               (it.theme ? '<div class="ltheme">' + esc(it.theme) + '</div>' : '') +
-              (it.homework ? '<div class="lhw">△ ' + esc(it.homework) + '</div>' : '') +
+              (it.homework ? '<div class="lhw">ДЗ · ' + esc(it.homework) + '</div>' : '') +
             '</div>' +
             (it.mark ? '<div class="mark ' + markClass(it.mark) + '">' + esc(it.mark) + '</div>' : '');
           row.onclick = () => openLessonSheet(it);
@@ -1084,32 +1098,39 @@ function showApp() {
   S.route = { screen: 'dairy', tab: 'dairy' };
   S.weekOffset = 0;
   render();
-  if (!S.user) {
-    Diary.getUserData().then((u) => { S.user = u; if (S.route.screen === 'settings') render(); }).catch(() => {});
-  }
+  // Расписание грузим в фоне, чтобы вкладка открывалась мгновенно.
+  setTimeout(() => { loadSchedule(false).catch(() => {}); }, 700);
 }
 
 async function boot() {
   applyTheme();
+  const started = Date.now();
   const splash = $('splash');
+  const hideSplash = () => {
+    const left = Math.max(0, 1000 - (Date.now() - started));
+    setTimeout(() => {
+      splash.classList.add('out');
+      setTimeout(() => splash.remove(), 420);
+    }, left);
+  };
+
   const login = Prefs.login();
   const pass = Prefs.password();
-  if (!login || !pass) {
-    splash.classList.add('out');
-    setTimeout(() => splash.remove(), 450);
-    showLogin();
-    return;
-  }
+  if (!login || !pass) { hideSplash(); showLogin(); return; }
+
+  // Сессия восстанавливается локально, экран показываем сразу —
+  // сетевые данные догружаются под скелетонами.
   await Diary.restoreSession(login, pass);
-  try {
-    S.user = await Diary.getUserData();
-  } catch (e) {}
-  if (!Prefs.uchYear()) {
-    try { Prefs.setUchYear(await Diary.getUchYear()); } catch (e) {}
-  }
-  splash.classList.add('out');
-  setTimeout(() => splash.remove(), 450);
   showApp();
+  hideSplash();
+
+  if (!Prefs.uchYear()) {
+    Diary.getUchYear().then((y) => Prefs.setUchYear(y)).catch(() => {});
+  }
+  Diary.getUserData().then((u) => {
+    S.user = u;
+    if (S.route.screen === 'settings') render();
+  }).catch(() => {});
 }
 
 window.LT28 = {
