@@ -32,3 +32,7 @@ updateserver/config.php
 
 # секреты сервера
 updateserver/config.php
+
+# ключи Yandex Cloud
+authorized_key*.json
+key-*.json
