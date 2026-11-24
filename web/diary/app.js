@@ -330,6 +330,23 @@ const Diary = (() => {
     const subjectsData = parseArray(subjectsRaw);
     const teachersData = parseArray(teachersRaw);
 
+    // Периоды приходят в тех же строках: [5] — id, [6] — начало, [7] — конец.
+    // Урок привязываем к самому узкому периоду по дате, чтобы годовая строка
+    // не перетягивала на себя оценки (как в приложении).
+    const periodRanges = lessonsData.map(l => {
+      const id = Number(l[5]);
+      const begin = parseJsDate(l[6]);
+      const end = parseJsDate(l[7]);
+      if (!id || !begin || !end) return null;
+      return { id, begin: begin.getTime(), end: end.getTime() };
+    }).filter(Boolean).sort((a, b) => (a.end - a.begin) - (b.end - b.begin));
+
+    const numOrNull = (v) => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+
     const results = [];
     for (const srow of subjectsData) {
       const subjId = Number(srow[0]);
@@ -343,16 +360,20 @@ const Diary = (() => {
         .filter(l => Number(l[14]) === subjId)
         .map(l => {
           const lessonId = Number(l[0]);
-          const periodId = Number(l[5]) || null;
-          const dateStr = l[7];
+          const date = parseJsDate(l[7]);
+          const range = date
+            ? periodRanges.find(p => date.getTime() >= p.begin && date.getTime() <= p.end)
+            : null;
           const markRec = marksData.find(m =>
             Number(m[4]) === subjId && Number(m[0]) === lessonId);
           return {
-            lessonId, periodId,
-            date: typeof dateStr === 'string' ? parseJsDate(dateStr) : null,
+            lessonId,
+            periodId: range ? range.id : null,
+            date,
             subjectName: subjName, theme: l[4] || null, homework: l[8] || null,
             mark: markRec ? (markRec[2] || '') : '',
-            weight: Number(l[3]) || null,
+            // Журнал берёт вес из [9] (может быть дробным), [3] — запасной вариант.
+            weight: numOrNull(l[9]) !== null ? numOrNull(l[9]) : numOrNull(l[3]),
           };
         });
 
