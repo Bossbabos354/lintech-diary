@@ -227,7 +227,7 @@ async function loadWeek(offset, force) {
 
 async function loadSchedule(force) {
   if (!S.schedule) {
-    const cached = lsGetJson('lt_schedule_cache', null);
+    const cached = lsGetJson('lt_schedule_cache_v2', null);
     if (cached && cached.data) { S.schedule = cached.data; S.scheduleAt = cached.at || 0; }
   }
   const fresh = Date.now() - S.scheduleAt < 5 * 60 * 1000;
@@ -240,7 +240,7 @@ async function loadSchedule(force) {
       if (!data || !data.lessons) continue;
       S.schedule = data;
       S.scheduleAt = Date.now();
-      lsSetJson('lt_schedule_cache', { at: S.scheduleAt, data });
+      lsSetJson('lt_schedule_cache_v2', { at: S.scheduleAt, data });
       return S.schedule;
     } catch (e) {}
   }
@@ -397,7 +397,7 @@ function refreshCurrent() {
   if (sc === 'marks' || sc === 'subject' || sc === 'goals' || sc === 'critical') {
     S.subjects = null; S.subjectsAt = 0; Prefs.del('lt_marks_cache');
   }
-  if (sc === 'schedule') { S.schedule = null; S.scheduleAt = 0; Prefs.del('lt_schedule_cache'); }
+  if (sc === 'schedule') { S.schedule = null; S.scheduleAt = 0; Prefs.del('lt_schedule_cache_v2'); }
   toast('Обновляю…');
   render();
 }
