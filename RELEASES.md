@@ -12,6 +12,7 @@
 | 3.0.3 | Android 3.0.3 | `0f4c5bb` | APK `SchoolDiary_3.0.3.apk` |
 | 3.0.4 | Android 3.0.4 | `0161570` | APK `SchoolDiary_3.0.4.apk` |
 | 3.0.5 | десктоп 3.0.5 | `9baf1c1` | `.deb`, `.rpm`, `.msi` |
+| 3.0.6 | десктоп 3.0.6 | `e52edb7` | `.deb`, `.rpm`, `.msi` |
 
 ## Как выбрать файл
 
