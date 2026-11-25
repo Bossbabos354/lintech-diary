@@ -111,6 +111,19 @@ jobs:
         with:
           path: artifacts
 
+      # В релиз всегда попадает актуальный APK Android: иначе десктопный
+      # релиз становится «latest» без приложения для телефона.
+      - name: Attach latest Android APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts/apk
+          for tag in $(gh release list --limit 30 --json tagName --jq '.[].tagName'); do
+            if gh release view "$tag" --json assets --jq '.assets[].name' | grep -q '\.apk$'; then
+              gh release download "$tag" -p '*.apk' -D artifacts/apk && break
+            fi
+          done
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
