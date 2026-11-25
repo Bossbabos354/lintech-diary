@@ -2,15 +2,15 @@ package ru.school28.diary.api
 
 /** Звонок: номер урока и время начала/конца. */
 data class BellTime(
-    val n: Int,
-    val start: String,
-    val end: String
+    val n: Int = 0,
+    val start: String = "",
+    val end: String = ""
 )
 
 /** Урок в расписании класса. */
 data class ScheduleLesson(
-    val n: Int,
-    val subject: String,
+    val n: Int = 0,
+    val subject: String = "",
     val teacher: String? = null,
     val room: String? = null
 )

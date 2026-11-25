@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "ru.school28"
-version = "3.0.5"
+version = "3.0.6"
 
 dependencies {
     implementation(compose.desktop.currentOs)
@@ -64,6 +64,9 @@ compose.desktop {
         mainClass = "ru.school28.diary.MainKt"
 
         nativeDistributions {
+            // Gson берёт sun.misc.Unsafe из jdk.unsupported: без модуля
+            // не создаёт объекты моделей расписания.
+            modules("jdk.unsupported")
             targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi)
             packageName = "lintech28-diary"
             packageVersion = project.version.toString()
