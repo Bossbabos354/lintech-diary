@@ -352,15 +352,22 @@ fetch('update.json', { cache: 'no-store' })
     if (db) db.href = RELEASES_URL;
   });
 
-// Ссылку на APK берём из последнего релиза, чтобы кнопка не ломалась
-// при смене версии.
-fetch(RELEASES_API, { cache: 'no-store' })
+// Ссылку на APK берём из ближайшего релиза, где он есть: десктопные
+// релизы могут быть новее и идти без приложения для телефона.
+function useApkFrom(list){
+  for (var i = 0; i < list.length; i++) {
+    var apk = (list[i].assets || []).filter(function(a){ return /\.apk$/i.test(a.name); })[0];
+    if (apk) { var db = document.getElementById('dlBtn'); if (db) db.href = apk.browser_download_url; return true; }
+  }
+  return false;
+}
+fetch(RELEASES_API + 's?per_page=10', { cache: 'no-store' })
   .then(function(r){ return r.ok ? r.json() : null; })
-  .then(function(j){
-    if (!j) return;
-    var apk = (j.assets || []).filter(function(a){ return /\.apk$/i.test(a.name); })[0];
-    var db = document.getElementById('dlBtn');
-    if (apk && db) db.href = apk.browser_download_url;
+  .then(function(list){
+    if (Array.isArray(list) && useApkFrom(list)) return;
+    return fetch(RELEASES_API, { cache: 'no-store' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ if (j) useApkFrom([j]); });
   })
   .catch(function(){});
 
