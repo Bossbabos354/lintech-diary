@@ -60,17 +60,13 @@ cd desktop
 
 ## Обновления
 
-Клиент проверяет `http://d91950hv.beget.tech/desktop/update.json`:
+Клиент проверяет последний релиз через GitHub API:
+`https://api.github.com/repos/Bossbabos354/lintech-diary/releases/latest`.
+Из ответа берутся `tag_name` и ссылки на файлы релиза (`.deb`, `.rpm`, `.msi`).
 
-```json
-{
-  "versionName": "1.1.0",
-  "url": "https://d91950hv.beget.tech/desktop/lintech28-diary_1.1.0_amd64.deb",
-  "notes": "Что нового"
-}
-```
+Расписание и события скачиваются с GitHub Pages:
+`https://bossbabos354.github.io/lintech-diary/data/schedule.json` и `events.json`.
 
-Пока файла нет, сервер отвечает 404 и приложение честно пишет, что канал обновлений не настроен.
 Версия задаётся один раз — `version` в `build.gradle.kts`. Оттуда Gradle подставляет её
 в `packageVersion`, в ресурс `version.properties`, а `BuildInfo.VERSION_NAME` читает ресурс.
 
