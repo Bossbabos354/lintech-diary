@@ -715,7 +715,7 @@ object ApiClient {
     // ---- СОБЫТИЯ (синхронизация с сайтом Beget) ----
 
     /** URL файла событий на сайте (без учёта авторизации дневника). */
-    private const val EVENTS_URL = "http://d91950hv.beget.tech/events.json"
+    private const val EVENTS_URL = "https://bossbabos354.github.io/lintech-diary/data/events.json"
 
     /** Скачивает список событий с сайта школы. Пустой список при ошибке/отсутствии. */
     suspend fun getEvents(): List<SchoolEvent> = withContext(Dispatchers.IO) {
@@ -741,7 +741,7 @@ object ApiClient {
 
     // ---- РАСПИСАНИЕ (сайт школы) ----
 
-    private const val SCHEDULE_URL = "http://d91950hv.beget.tech/schedule.json"
+    private const val SCHEDULE_URL = "https://bossbabos354.github.io/lintech-diary/data/schedule.json"
     private const val SCHEDULE_TTL_MS = 5 * 60_000L
 
     @Volatile
