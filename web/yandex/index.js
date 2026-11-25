@@ -43,7 +43,7 @@ async function github(body) {
   };
 
   if (body.op === 'read') {
-    const resp = await fetch(url + '?ref=main', { headers });
+    const resp = await fetch(url + '?ref=master', { headers });
     const data = await resp.json();
     if (!resp.ok) return { status: resp.status, data: { ok: false, error: data.message || 'GitHub error' } };
     return { status: 200, data: { ok: true, sha: data.sha, content: Buffer.from(data.content || '', 'base64').toString('utf8') } };
@@ -53,7 +53,7 @@ async function github(body) {
     const payload = {
       message: String(body.message || 'Админка: обновление данных'),
       content: Buffer.from(String(body.content || ''), 'utf8').toString('base64'),
-      branch: 'main',
+      branch: 'master',
     };
     if (body.sha) payload.sha = body.sha;
     const resp = await fetch(url, {
