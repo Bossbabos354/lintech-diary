@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админка — ЛинТех 28</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #0d0817; color: #ece9ff; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #8f89ad; font-size: 13px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: #b9b3d6; margin: 14px 0 6px; }
+  input, select, textarea, button { width: 100%; box-sizing: border-box; font: inherit; }
+  input, select, textarea { background: #161022; color: #ece9ff; border: 1px solid #2c2440;
+         border-radius: 12px; padding: 10px 12px; }
+  textarea { min-height: 320px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  button { margin-top: 14px; padding: 12px; border: 0; border-radius: 12px;
+           background: #6c4bd6; color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  #status { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  .ok { color: #7ee0a8; } .err { color: #ff8a8a; }
+  a { color: #b9a6ff; }
+</style>
+</head>
+<body>
+  <h1>Админка расписания и событий</h1>
+  <div class="sub">Правки сохраняются коммитом в <code>web/data/*.json</code> репозитория на GitHub.</div>
+
+  <label>Пароль администратора</label>
+  <input id="token" type="password" placeholder="Пароль" autocomplete="current-password">
+
+  <div class="row">
+    <div>
+      <label>Файл</label>
+      <select id="file">
+        <option value="schedule.json">Расписание</option>
+        <option value="events.json">События</option>
+      </select>
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button id="loadBtn" type="button">Загрузить</button>
+    </div>
+  </div>
+
+  <label>Содержимое (JSON)</label>
+  <textarea id="content" spellcheck="false"></textarea>
+
+  <button id="saveBtn" type="button">Сохранить в репозиторий</button>
+  <div id="status"></div>
+  <div class="sub" style="margin-top:18px">
+    <a href="schedule-admin.html">Панель расписания и звонков</a> — полный редактор классов, звонков и уроков.<br>
+  </div>
+  <div class="sub" style="margin-top:8px">
+    После сохранения GitHub Pages пересобирается ~40 секунд. Приложение на Android
+    берёт данные оттуда же.
+  </div>
+
+<script src="admin-auth.js"></script>
+<script>
+const TOKEN_KEY = 'lintech_admin_token';
+
+const tokenEl = document.getElementById('token');
+const fileEl = document.getElementById('file');
+const contentEl = document.getElementById('content');
+const statusEl = document.getElementById('status');
+let currentSha = null;
+
+tokenEl.value = localStorage.getItem(TOKEN_KEY) || '';
+tokenEl.addEventListener('input', () => {
+  if (tokenEl.value.trim()) localStorage.setItem(TOKEN_KEY, tokenEl.value.trim());
+});
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = cls || '';
+}
+
+function request(body) {
+  const password = tokenEl.value.trim();
+  if (!password) throw new Error('Нужен пароль администратора');
+  localStorage.setItem(TOKEN_KEY, password);
+  AdminAuth.set(password);
+  return AdminAuth.request({ ...body, password, path: 'web/data/' + fileEl.value }).then(data => {
+    if (!data.ok && /парол/i.test(String(data.error || ''))) localStorage.removeItem(TOKEN_KEY);
+    return data;
+  });
+}
+
+async function load() {
+  try {
+    setStatus('Загружаю…');
+    const data = await request({ op: 'read' });
+    if (!data.ok) throw new Error(data.error || 'Ошибка загрузки');
+    currentSha = data.sha;
+    contentEl.value = data.content;
+    setStatus('Загружено: ' + fileEl.value, 'ok');
+  } catch (e) {
+    currentSha = null;
+    setStatus(e.message, 'err');
+  }
+}
+
+async function save() {
+  let parsed;
+  try {
+    parsed = JSON.parse(contentEl.value);
+  } catch (e) {
+    setStatus('Некорректный JSON: ' + e.message, 'err');
+    return;
+  }
+  try {
+    setStatus('Сохраняю…');
+    const data = await request({
+      op: 'write',
+      sha: currentSha,
+      message: 'Админка: обновлён ' + fileEl.value,
+      content: JSON.stringify(parsed, null, 2) + '\n'
+    });
+    if (!data.ok) throw new Error(data.error || 'Ошибка сохранения');
+    currentSha = data.sha;
+    setStatus('Сохранено коммитом ' + data.commit.slice(0, 7) + '. Pages обновится через ~40 с.', 'ok');
+  } catch (e) {
+    setStatus(e.message, 'err');
+  }
+}
+
+document.getElementById('loadBtn').onclick = load;
+document.getElementById('saveBtn').onclick = save;
+fileEl.onchange = () => { currentSha = null; contentEl.value = ''; setStatus(''); };
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f1f2fa">
+<title>ЛинТех 28 — Электронный дневник</title>
+<link rel="stylesheet" href="style.css?v=8">
+</head>
+<body>
+
+<div class="bg" id="bg">
+  <div class="blob a"></div>
+  <div class="blob b"></div>
+  <div class="blob c"></div>
+  <div class="blob d"></div>
+</div>
+
+<div class="splash" id="splash">
+  <div class="logo">
+    <div class="logo-badge">28</div>
+    <div style="text-align:center;font-weight:800;font-size:15px;letter-spacing:.2px;margin-top:12px">ЛинТех 28</div>
+    <div class="splash-line" id="splashLine"></div>
+  </div>
+  <div class="splash-bar"><i></i></div>
+</div>
+
+<div id="login" class="login-wrap" hidden></div>
+
+<div id="app" hidden>
+  <div class="app">
+    <header class="header" id="header"></header>
+    <main id="content"></main>
+  </div>
+  <nav class="tabbar" id="tabbar"></nav>
+</div>
+
+<div class="overlay hidden" id="overlay">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>window.LINTECH_PROXY = 'https://functions.yandexcloud.net/d4eojimh0r45jrrtadm0';</script>
+<script src="app.js?v=8"></script>
+<script src="ui.js?v=9"></script>
+</body>
+</html>
